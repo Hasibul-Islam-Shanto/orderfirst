@@ -1,0 +1,217 @@
+networks:
+  public:
+    driver: bridge
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: orderfirst-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orderfirst
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_master_password}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orderfirst"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: orderfirst-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  auth:
+    build:
+      context: ../services/auth
+      dockerfile: Dockerfile
+    container_name: orderfirst-auth
+    restart: unless-stopped
+    environment:
+      PORT: 4001
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://auth_user:auth_password_123@postgres:5432/orderfirst?schema=auth
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-at-least-32-characters}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-internal-secret-for-microservices-mesh-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_APP_PASSWORD: ${EMAIL_APP_PASSWORD:-}
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4001/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  catalog:
+    build:
+      context: ../services/catalog
+      dockerfile: Dockerfile
+    container_name: orderfirst-catalog
+    restart: unless-stopped
+    environment:
+      PORT: 4002
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://catalog_user:catalog_password_123@postgres:5432/orderfirst?schema=catalog
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-at-least-32-characters}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-internal-secret-for-microservices-mesh-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4002/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  booking:
+    build:
+      context: ../services/booking
+      dockerfile: Dockerfile
+    container_name: orderfirst-booking
+    restart: unless-stopped
+    environment:
+      PORT: 4003
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://booking_user:booking_password_123@postgres:5432/orderfirst?schema=booking
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-at-least-32-characters}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-internal-secret-for-microservices-mesh-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4003/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  orders:
+    build:
+      context: ../services/orders
+      dockerfile: Dockerfile
+    container_name: orderfirst-orders
+    restart: unless-stopped
+    environment:
+      PORT: 4004
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://orders_user:orders_password_123@postgres:5432/orderfirst?schema=orders
+      CATALOG_SERVICE_URL: http://catalog:4002
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-at-least-32-characters}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-internal-secret-for-microservices-mesh-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4004/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notify:
+    build:
+      context: ../services/notify
+      dockerfile: Dockerfile
+    container_name: orderfirst-notify
+    restart: unless-stopped
+    environment:
+      PORT: 4005
+      NODE_ENV: ${NODE_ENV:-development}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_APP_PASSWORD: ${EMAIL_APP_PASSWORD:-}
+    networks:
+      - internal
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4005/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: ../services/gateway
+      dockerfile: Dockerfile
+    container_name: orderfirst-gateway
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      NODE_ENV: ${NODE_ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-at-least-32-characters}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-internal-secret-for-microservices-mesh-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      AUTH_SERVICE_URL: http://auth:4001
+      CATALOG_SERVICE_URL: http://catalog:4002
+      BOOKING_SERVICE_URL: http://booking:4003
+      ORDERS_SERVICE_URL: http://orders:4004
+      NOTIFY_SERVICE_URL: http://notify:4005
+    ports:
+      - "4000:4000"
+    networks:
+      - public
+      - internal
+    depends_on:
+      auth:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+      booking:
+        condition: service_healthy
+      orders:
+        condition: service_healthy
+      notify:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+

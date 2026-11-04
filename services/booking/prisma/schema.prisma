@@ -1,0 +1,52 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["booking"]
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+
+  @@schema("booking")
+}
+
+model RestaurantTable {
+  id           String        @id @default(uuid()) @db.Uuid
+  tableNumber  Int           @unique
+  capacity     Int
+  isAvailable  Boolean       @default(true)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  @@schema("booking")
+}
+
+model Reservation {
+  id                String            @id @default(uuid()) @db.Uuid
+  userId            String            @db.Uuid
+  customerName      String            @db.VarChar(80)
+  customerEmail     String            @db.VarChar(254)
+  restaurantTableId String            @db.Uuid
+  restaurantTable   RestaurantTable   @relation(fields: [restaurantTableId], references: [id], onDelete: Restrict)
+  reservationDate   DateTime          @db.Timestamp(3)
+  guestCount        Int
+  specialRequest    String?           @db.VarChar(500)
+  status            ReservationStatus @default(PENDING)
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, reservationDate])
+  @@index([restaurantTableId, reservationDate])
+  @@index([status, reservationDate])
+  @@schema("booking")
+}
+

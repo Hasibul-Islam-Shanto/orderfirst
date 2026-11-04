@@ -1,0 +1,64 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["orders"]
+}
+
+enum OrderType {
+  DINE_IN
+  PICKUP
+
+  @@schema("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+
+  @@schema("orders")
+}
+
+model Order {
+  id            String      @id @default(uuid()) @db.Uuid
+  userId        String      @db.Uuid
+  customerName  String      @db.VarChar(80)
+  customerEmail String      @db.VarChar(254)
+  status        OrderStatus @default(PENDING)
+  orderType     OrderType
+  subtotal      Decimal     @db.Decimal(10, 2)
+  total         Decimal     @db.Decimal(10, 2)
+  notes         String?     @db.VarChar(500)
+  items         OrderItem[]
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@schema("orders")
+}
+
+model OrderItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  orderId      String   @db.Uuid
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  menuItemId   String   @db.Uuid
+  menuItemName String   @db.VarChar(100)
+  quantity     Int
+  unitPrice    Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([orderId, menuItemId])
+  @@index([orderId])
+  @@index([menuItemId])
+  @@schema("orders")
+}
+
