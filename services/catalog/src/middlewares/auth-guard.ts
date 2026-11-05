@@ -18,7 +18,6 @@ export const requireAdmin: RequestHandler = (request, _response, next) => {
     );
   }
 
-  // Fallback to checking session cookie or Authorization header
   const token =
     (request.cookies as Record<string, unknown> | undefined)?.[
       'orderfirst_session'
@@ -34,11 +33,9 @@ export const requireAdmin: RequestHandler = (request, _response, next) => {
         return next();
       }
     } catch {
-      // Token verification failed, fall through to 401/403
     }
   }
 
-  // Also check direct header for integration tests
   if (request.headers['x-user-role'] === 'ADMIN') {
     return next();
   }

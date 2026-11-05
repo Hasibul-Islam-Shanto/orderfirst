@@ -1,4 +1,4 @@
-# OrderFirst Frontend
+# OrderFirst Client
 
 React SPA for the OrderFirst restaurant ordering and reservation platform.
 
@@ -19,7 +19,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Start the API from `../backend` first. The local example uses `VITE_API_URL=http://localhost:4000/api`; production can omit it when a reverse proxy serves the API at `/api`.
+Ensure the microservices infrastructure is running (`infra/docker-compose.yml`). The client connects to the API Gateway at `http://localhost:4000/api`.
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 

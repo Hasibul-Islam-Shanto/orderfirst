@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
 import { logger, errorContext } from './config/logger.js';
+import { requestContext } from './config/context.js';
 import { AppError } from './errors/app-error.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { orderRouter, adminOrderRouter } from './modules/orders/order.route.js';
@@ -16,13 +17,18 @@ export function createApp() {
   app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
   app.use((request, response, next) => {
-    request.requestId = randomUUID();
-    response.setHeader('X-Request-Id', request.requestId);
+    const incomingId = request.headers['x-request-id'];
+    const requestId =
+      typeof incomingId === 'string' && incomingId.trim().length > 0
+        ? incomingId.trim()
+        : randomUUID();
+    request.requestId = requestId;
+    response.setHeader('X-Request-Id', requestId);
     const started = performance.now();
     response.on('finish', () =>
       logger.info(
         {
-          requestId: request.requestId,
+          requestId,
           method: request.method,
           statusCode: response.statusCode,
           durationMs: Math.round(performance.now() - started),
@@ -30,7 +36,7 @@ export function createApp() {
         'Request completed',
       ),
     );
-    next();
+    requestContext.run({ requestId }, () => next());
   });
 
   app.use(helmet());

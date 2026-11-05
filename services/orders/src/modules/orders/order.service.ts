@@ -11,6 +11,7 @@ import type {
   orderListRequest,
 } from './order.validation.js';
 import { fetchCatalogBatchWithRetry } from '../catalog-client/catalog.client.js';
+import { publishOrderCreated } from '../../amqp/publisher.js';
 
 const orderInclude = {
   items: true,
@@ -61,7 +62,7 @@ export async function createOrder(
 
     const subtotal = calculateOrderTotal(orderItems);
 
-    return await serializableTransaction(async (transaction) => {
+    const createdOrder = await serializableTransaction(async (transaction) => {
       return transaction.order.create({
         data: {
           userId: user.id,
@@ -78,6 +79,20 @@ export async function createOrder(
         include: orderInclude,
       });
     });
+
+    publishOrderCreated({
+      orderId: createdOrder.id,
+      customerEmail: createdOrder.customerEmail,
+      customerName: createdOrder.customerName,
+      total: Number(createdOrder.total).toFixed(2),
+      items: createdOrder.items.map((item) => ({
+        name: item.menuItemName,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice).toFixed(2),
+      })),
+    });
+
+    return createdOrder;
   } catch (error) {
     logger.warn(
       { userId: user.id, error: errorContext(error) },

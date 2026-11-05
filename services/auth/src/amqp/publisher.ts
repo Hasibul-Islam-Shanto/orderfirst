@@ -1,6 +1,7 @@
 import amqplib from 'amqplib';
 import { env } from '../config/env.js';
 import { logger, errorContext } from '../config/logger.js';
+import { getRequestId } from '../config/context.js';
 
 let connection: amqplib.ChannelModel | null = null;
 let channel: amqplib.Channel | null = null;
@@ -43,8 +44,16 @@ export interface UserRegisteredEvent {
   expiresAt: string;
 }
 
+export let lastTestVerificationCode: string | undefined;
+export let lastPublishedUserRegistered: UserRegisteredEvent | undefined;
+
+export function setTestVerificationCode(code: string | undefined): void {
+  lastTestVerificationCode = code;
+}
+
 export function publishUserRegistered(event: UserRegisteredEvent): void {
-  // Non-blocking fire-and-forget
+  lastTestVerificationCode = event.otpCode;
+  lastPublishedUserRegistered = event;
   setImmediate(async () => {
     try {
       const ch = await getAmqpChannel();
@@ -56,9 +65,14 @@ export function publishUserRegistered(event: UserRegisteredEvent): void {
         return;
       }
       const message = Buffer.from(JSON.stringify(event));
+      const requestId = getRequestId();
       ch.publish(EXCHANGE, 'user.registered', message, {
         persistent: true,
         contentType: 'application/json',
+        ...(requestId ? { correlationId: requestId } : {}),
+        headers: {
+          ...(requestId ? { 'x-request-id': requestId } : {}),
+        },
       });
       logger.info({ userId: event.userId }, 'Published user.registered event');
     } catch (error) {
@@ -75,6 +89,5 @@ export async function closeAmqp(): Promise<void> {
     if (channel) await channel.close();
     if (connection) await connection.close();
   } catch {
-    // Ignore error during shutdown
   }
 }

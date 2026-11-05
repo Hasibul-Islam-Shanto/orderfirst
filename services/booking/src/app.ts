@@ -81,13 +81,11 @@ export function createApp() {
     }
   });
 
-  // Reservations
   app.use('/reservations', reservationRouter);
   app.use('/api/reservations', reservationRouter);
   app.use('/admin/reservations', adminReservationRouter);
   app.use('/api/admin/reservations', adminReservationRouter);
 
-  // Tables
   app.use('/tables', tableRouter);
   app.use('/api/tables', tableRouter);
   app.use('/admin/tables', tableRouter);

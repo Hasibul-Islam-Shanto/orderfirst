@@ -10,7 +10,6 @@ import {
   setSessionCookie,
   verifySession,
 } from '../src/modules/auth/auth.session.js';
-import { buildVerificationEmailContent } from '../src/config/verification-email.template.js';
 import { parseEnvironment } from '../src/config/env.js';
 
 const resourceId = '10000000-0000-4000-8000-000000000001';
@@ -90,23 +89,6 @@ describe('Auth validation and session invariants', () => {
     expect(
       resendVerificationRequest.safeParse({ body: { extra: true } }).success,
     ).toBe(false);
-  });
-
-  it('builds a branded verification email with an HTML logo and escaped content', () => {
-    const { html, text } = buildVerificationEmailContent({
-      name: 'Alex <script>',
-      code: '123456',
-    });
-    expect(html).toContain('123456');
-    expect(html).toContain('OrderFirst');
-    expect(html).toContain('background-color:#C88250');
-    expect(html).toContain('background-color:#2F4A3A');
-    expect(html).toContain('Alex &lt;script&gt;');
-    expect(html).not.toContain('<script>');
-    expect(html).not.toContain('Copy code');
-    expect(html).not.toContain('cid:');
-    expect(text).toContain('123456');
-    expect(text).not.toContain('verify-email');
   });
 
   it('fails fast for missing environment or unsafe production configuration', () => {

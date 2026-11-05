@@ -21,7 +21,7 @@ OrderFirst has been migrated from a monolithic backend into a distributed, produ
 
 ## Directory Structure
 
-- `frontend/` - React, TypeScript, Vite, Tailwind CSS client application (pointing to API Gateway at `:4000`).
+- `client/` - React, TypeScript, Vite, Tailwind CSS client application (pointing to API Gateway at `:4000`).
 - `services/` - Standalone microservices:
   - `gateway/` (Port 4000): API Gateway reverse proxy and edge security
   - `auth/` (Port 4001): Authentication & user identity service (`auth` PostgreSQL schema)
@@ -33,7 +33,12 @@ OrderFirst has been migrated from a monolithic backend into a distributed, produ
   - `docker-compose.yml`: Multi-container topology with network isolation & healthchecks
   - `postgres/init/01-init.sql`: Isolated schemas (`auth`, `catalog`, `orders`, `booking`) and dedicated least-privilege roles
   - `rabbitmq/`: Message broker configurations
-- `backend/` - Archived legacy monolith documentation (`backend/README.md`).
+- `deploy/` - Production deployment hub:
+  - `compose/`: Production container configurations
+  - `jenkins/`: CI/CD pipelines
+  - `monitoring/`: Prometheus & Grafana configurations
+  - `proxy/`: Edge reverse proxy (Nginx)
+  - `scripts/`: Deployment & healthcheck automation scripts
 
 ---
 
@@ -60,10 +65,10 @@ Verify that the Gateway is healthy and downstream services are connected:
 curl http://localhost:4000/health/ready
 ```
 
-### 3. Run the Frontend
+### 3. Run the Client Application
 
 ```bash
-cd frontend
+cd client
 npm install
 npm run dev
 ```

@@ -30,7 +30,10 @@ export function createApp() {
 
   // Request ID and duration logging
   app.use((request, response, next) => {
-    request.requestId = randomUUID();
+    const incomingId = request.headers['x-request-id'];
+    request.requestId = (typeof incomingId === 'string' && incomingId.trim().length > 0)
+      ? incomingId.trim()
+      : randomUUID();
     response.setHeader('X-Request-Id', request.requestId);
     const started = performance.now();
     response.on('finish', () =>

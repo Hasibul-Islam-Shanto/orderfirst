@@ -22,6 +22,7 @@ const envSchema = z
       .default('info'),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     INTERNAL_SECRET: z.string().min(16).optional(),
+    RABBITMQ_URL: z.string().url().default('amqp://guest:guest@localhost:5672'),
   });
 
 export function parseEnvironment(source: NodeJS.ProcessEnv) {
