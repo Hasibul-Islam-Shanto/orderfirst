@@ -1,5 +1,16 @@
-import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+// Load .env from current directory or traverse upward to the monorepo root
+for (const dir of [process.cwd(), path.resolve(process.cwd(), '..'), path.resolve(process.cwd(), '../..')]) {
+  const envFile = path.join(dir, '.env');
+  if (fs.existsSync(envFile)) {
+    dotenv.config({ path: envFile });
+    break;
+  }
+}
 
 const envSchema = z
   .object({
