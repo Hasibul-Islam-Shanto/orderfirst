@@ -63,8 +63,6 @@ services:
       INTERNAL_SECRET: ${INTERNAL_SECRET:-internal-secret-for-microservices-mesh-min-16-chars}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      EMAIL_USER: ${EMAIL_USER:-}
-      EMAIL_APP_PASSWORD: ${EMAIL_APP_PASSWORD:-}
     networks:
       - internal
     depends_on:
@@ -140,12 +138,15 @@ services:
       JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-secret-at-least-32-characters}
       INTERNAL_SECRET: ${INTERNAL_SECRET:-internal-secret-for-microservices-mesh-min-16-chars}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     networks:
       - internal
     depends_on:
       postgres:
         condition: service_healthy
       catalog:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4004/health/ready || exit 1"]

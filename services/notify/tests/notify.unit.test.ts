@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { buildVerificationEmailContent } from '../src/config/verification-email.template.js';
+import { buildVerificationEmailContent } from '../src/templates/verification-email.template.js';
 import { errorContext } from '../src/config/logger.js';
 
 describe('Notify service unit and template checks', () => {

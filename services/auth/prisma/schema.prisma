@@ -44,3 +44,28 @@ model EmailVerificationCode {
   @@schema("auth")
 }
 
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+
+  @@schema("auth")
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  exchange      String       @db.VarChar(100)
+  routingKey    String       @db.VarChar(100)
+  payload       Json
+  correlationId String?      @db.VarChar(100)
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  lastError     String?      @db.Text
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  publishedAt   DateTime?    @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@schema("auth")
+}
+
+

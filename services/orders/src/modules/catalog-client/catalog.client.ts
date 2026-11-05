@@ -1,6 +1,7 @@
 import CircuitBreaker from 'opossum';
 import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
+import { getRequestId } from '../../config/context.js';
 import { AppError } from '../../errors/app-error.js';
 
 export interface CatalogMenuItem {
@@ -12,11 +13,13 @@ export interface CatalogMenuItem {
 
 async function fetchCatalogBatchRaw(ids: string[]): Promise<CatalogMenuItem[]> {
   const url = `${env.CATALOG_SERVICE_URL}/internal/menu-items/batch`;
+  const requestId = getRequestId();
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(env.INTERNAL_SECRET ? { 'X-Internal-Secret': env.INTERNAL_SECRET } : {}),
+      ...(requestId ? { 'X-Request-Id': requestId } : {}),
     },
     body: JSON.stringify({ ids }),
     signal: AbortSignal.timeout(3000),

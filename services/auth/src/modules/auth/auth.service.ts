@@ -3,10 +3,11 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../../config/prisma.js';
 import { AppError } from '../../errors/app-error.js';
 import { logger } from '../../config/logger.js';
-import { sendVerificationEmail } from '../../config/mail.js';
 import { serializableTransaction } from '../../utils/transaction.js';
 import { publicUserSelect } from '../users/user.service.js';
 import { publishUserRegistered } from '../../amqp/publisher.js';
+import { flushOutboxEvents } from '../../amqp/outbox-relay.js';
+import { getRequestId } from '../../config/context.js';
 import type { z } from 'zod';
 import type { registerRequest, loginRequest } from './auth.validation.js';
 
@@ -32,6 +33,15 @@ async function issueVerificationCode(
   const code = generateVerificationCode();
   const codeHash = await bcrypt.hash(code, 10);
   const expiresAt = new Date(Date.now() + verificationCodeTtlMs);
+  const requestId = getRequestId();
+  const eventPayload = {
+    userId,
+    name,
+    email,
+    otpCode: code,
+    expiresAt: expiresAt.toISOString(),
+  };
+
   await prisma.$transaction([
     prisma.emailVerificationCode.deleteMany({ where: { userId } }),
     prisma.emailVerificationCode.create({
@@ -41,15 +51,18 @@ async function issueVerificationCode(
         expiresAt,
       },
     }),
+    prisma.outboxEvent.create({
+      data: {
+        exchange: 'orderfirst.events',
+        routingKey: 'user.registered',
+        payload: eventPayload,
+        correlationId: requestId ?? null,
+      },
+    }),
   ]);
-  await sendVerificationEmail({ to: email, name, code });
-  publishUserRegistered({
-    userId,
-    name,
-    email,
-    otpCode: code,
-    expiresAt: expiresAt.toISOString(),
-  });
+
+  publishUserRegistered(eventPayload);
+  void flushOutboxEvents().catch(() => {});
 }
 
 export async function registerUser(

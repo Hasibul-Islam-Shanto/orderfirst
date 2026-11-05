@@ -31,25 +31,11 @@ const envSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
-    EMAIL_USER: z.string().email().optional(),
-    EMAIL_APP_PASSWORD: z.string().min(1).optional(),
     INTERNAL_SECRET: z.string().min(16).optional(),
     RABBITMQ_URL: z.string().url().default('amqp://guest:guest@localhost:5672'),
   })
   .superRefine((values, context) => {
     if (values.NODE_ENV === 'production') {
-      if (!values.EMAIL_USER)
-        context.addIssue({
-          code: 'custom',
-          path: ['EMAIL_USER'],
-          message: 'Email sender address is required',
-        });
-      if (!values.EMAIL_APP_PASSWORD)
-        context.addIssue({
-          code: 'custom',
-          path: ['EMAIL_APP_PASSWORD'],
-          message: 'Email app password is required',
-        });
       if (!values.FRONTEND_URL.startsWith('https://'))
         context.addIssue({
           code: 'custom',

@@ -12,7 +12,6 @@ interface JwtPayload {
 }
 
 export const authenticateUser: RequestHandler = (request, _response, next) => {
-  // Gateway header check
   if (
     env.INTERNAL_SECRET &&
     request.headers['x-internal-secret'] === env.INTERNAL_SECRET &&
@@ -30,7 +29,6 @@ export const authenticateUser: RequestHandler = (request, _response, next) => {
     }
   }
 
-  // Fallback to checking session cookie or Authorization header
   const token =
     (request.cookies as Record<string, unknown> | undefined)?.[
       'orderfirst_session'
@@ -52,11 +50,9 @@ export const authenticateUser: RequestHandler = (request, _response, next) => {
         return next();
       }
     } catch {
-      // Token invalid
     }
   }
 
-  // Direct header fallback for integration tests
   if (request.headers['x-user-id'] && typeof request.headers['x-user-id'] === 'string') {
     request.user = {
       id: request.headers['x-user-id'],

@@ -4,7 +4,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/config/prisma.js';
-import { lastTestVerificationCode } from '../src/config/mail.js';
+import { lastTestVerificationCode } from '../src/amqp/publisher.js';
 
 const app = createApp();
 const runId = randomUUID();
