@@ -30,11 +30,10 @@ OrderFirst has been migrated from a monolithic backend into a distributed, produ
   - `orders/` (Port 4004): Order state machine & catalog circuit breaker (`orders` PostgreSQL schema)
   - `notify/` (Port 4005): Asynchronous notification daemon consuming RabbitMQ events
 - `infra/` - Infrastructure definitions:
-  - `docker-compose.yml`: Multi-container topology with network isolation & healthchecks
-  - `postgres/init/01-init.sql`: Isolated schemas (`auth`, `catalog`, `orders`, `booking`) and dedicated least-privilege roles
+  - `postgres/init/01-init.sh`: Dynamic isolated schemas (`auth`, `catalog`, `orders`, `booking`) and dedicated least-privilege roles
   - `rabbitmq/`: Message broker configurations
-- `deploy/` - Production deployment hub:
-  - `compose/`: Production container configurations
+- `deploy/` - Deployment hub:
+  - `compose/`: Docker Compose configurations (multi-container topologies for dev, staging, prod)
   - `jenkins/`: CI/CD pipelines
   - `monitoring/`: Prometheus & Grafana configurations
   - `proxy/`: Edge reverse proxy (Nginx)
@@ -55,8 +54,8 @@ cp .env.example .env
 ### 2. Start Infrastructure and Microservices
 
 ```bash
-cd infra
-docker compose up -d --build
+docker compose -f deploy/compose/docker-compose.yml up -d --build
+# or: cd deploy/compose && docker compose up -d --build
 ```
 
 Verify that the Gateway is healthy and downstream services are connected:

@@ -15,7 +15,6 @@ React SPA for the OrderFirst restaurant ordering and reservation platform.
 
 ```bash
 npm install
-cp .env.example .env
 npm run dev
 ```
 
