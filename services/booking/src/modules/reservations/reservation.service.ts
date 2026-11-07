@@ -10,6 +10,10 @@ import {
   reservationDurationMinutes,
   reservationTransitions,
 } from './reservation.constants.js';
+import {
+  publishBookingCreated,
+  publishBookingStatusUpdated,
+} from '../../amqp/publisher.js';
 import type {
   createReservationRequest,
   reservationListRequest,
@@ -48,7 +52,7 @@ export async function createReservation(
   input: z.output<typeof createReservationRequest>['body'],
 ) {
   try {
-    return await serializableTransaction(async (transaction) => {
+    const createdReservation = await serializableTransaction(async (transaction) => {
       if (input.reservationDate.getTime() <= Date.now())
         throw new AppError(
           400,
@@ -89,7 +93,7 @@ export async function createReservation(
           'Selected table is not available for this time',
           'RESERVATION_CONFLICT',
         );
-      return transaction.reservation.create({
+      const created = await transaction.reservation.create({
         data: {
           userId: user.id,
           customerName: user.name || 'Valued Guest',
@@ -101,7 +105,19 @@ export async function createReservation(
         },
         include: { restaurantTable: true },
       });
+      return created;
     });
+
+    publishBookingCreated({
+      bookingId: createdReservation.id,
+      userId: createdReservation.userId,
+      customerEmail: createdReservation.customerEmail,
+      customerName: createdReservation.customerName,
+      partySize: createdReservation.guestCount,
+      reservationTime: createdReservation.reservationDate.toISOString(),
+    });
+
+    return createdReservation;
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientUnknownRequestError &&
@@ -187,7 +203,7 @@ export async function getAdminReservationById(reservationId: string) {
 }
 
 export async function cancelReservation(userId: string, reservationId: string) {
-  return serializableTransaction(async (transaction) => {
+  const cancelled = await serializableTransaction(async (transaction) => {
     const reservation = await transaction.reservation.findFirst({
       where: { id: reservationId, userId },
     });
@@ -209,13 +225,25 @@ export async function cancelReservation(userId: string, reservationId: string) {
       include: { restaurantTable: true },
     });
   });
+
+  publishBookingStatusUpdated({
+    bookingId: cancelled.id,
+    userId: cancelled.userId,
+    status: cancelled.status,
+    customerEmail: cancelled.customerEmail,
+    customerName: cancelled.customerName,
+    partySize: cancelled.guestCount,
+    reservationTime: cancelled.reservationDate.toISOString(),
+  });
+
+  return cancelled;
 }
 
 export async function updateReservationStatus(
   reservationId: string,
   status: ReservationStatus,
 ) {
-  return serializableTransaction(async (transaction) => {
+  const updated = await serializableTransaction(async (transaction) => {
     const reservation = await transaction.reservation.findUnique({
       where: { id: reservationId },
     });
@@ -253,5 +281,36 @@ export async function updateReservationStatus(
       include: { restaurantTable: true },
     });
   });
+
+  publishBookingStatusUpdated({
+    bookingId: updated.id,
+    userId: updated.userId,
+    status: updated.status,
+    customerEmail: updated.customerEmail,
+    customerName: updated.customerName,
+    partySize: updated.guestCount,
+    reservationTime: updated.reservationDate.toISOString(),
+  });
+
+  return updated;
+}
+
+export async function getBookingSummary() {
+  const [upcomingReservations, availableTables] = await Promise.all([
+    prisma.reservation.count({
+      where: {
+        reservationDate: { gte: new Date() },
+        status: { in: ['PENDING', 'CONFIRMED'] },
+      },
+    }),
+    prisma.restaurantTable.count({
+      where: { isAvailable: true },
+    }),
+  ]);
+
+  return {
+    upcomingReservations,
+    availableTables,
+  };
 }
 

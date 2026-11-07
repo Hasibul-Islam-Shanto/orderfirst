@@ -6,6 +6,8 @@ import type {
   loginRequest,
   registerRequest,
   verifyEmailRequest,
+  updateProfileRequest,
+  changePasswordRequest,
 } from './auth.validation.js';
 import { sendSuccess } from '../../utils/response.js';
 import { requireUser } from '../../middlewares/authenticate-user.js';
@@ -73,4 +75,26 @@ export async function resendVerificationEmail(
     'Verification code sent. Check your email.',
   );
 }
+
+export async function updateProfile(
+  request: Request,
+  response: Response,
+  input: z.output<typeof updateProfileRequest>,
+) {
+  const userId = requireUser(request).id;
+  const user = await service.updateProfile(userId, input.body);
+  setSessionCookie(response, user);
+  return sendSuccess(response, user, 'Profile updated successfully');
+}
+
+export async function changePassword(
+  request: Request,
+  response: Response,
+  input: z.output<typeof changePasswordRequest>,
+) {
+  const userId = requireUser(request).id;
+  const result = await service.changePassword(userId, input.body);
+  return sendSuccess(response, result, 'Password changed successfully');
+}
+
 

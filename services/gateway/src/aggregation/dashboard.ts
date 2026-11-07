@@ -9,35 +9,38 @@ export async function getAggregatedDashboard(_request: Request, response: Respon
   };
 
   const results = await Promise.allSettled([
-    // Orders
-    fetch(`${env.ORDERS_SERVICE_URL}/admin/orders`, {
+    // Orders Summary
+    fetch(`${env.ORDERS_SERVICE_URL}/admin/orders/summary`, {
       headers: internalHeaders,
       signal: AbortSignal.timeout(3000),
     }).then(async (res) => {
-      if (!res.ok) throw new Error(`Orders error: ${res.status}`);
-      return res.json() as Promise<{ data: any[]; pagination?: any }>;
+      if (!res.ok) throw new Error(`Orders summary error: ${res.status}`);
+      return res.json() as Promise<{
+        data: {
+          todayRevenue: number;
+          todayOrders: number;
+          recentOrders: any[];
+          popularMenuItems: Array<{ menuItemId: string; name: string; quantity: number }>;
+        };
+      }>;
     }),
 
-    // Booking Reservations
-    fetch(`${env.BOOKING_SERVICE_URL}/admin/reservations`, {
+    // Booking Summary
+    fetch(`${env.BOOKING_SERVICE_URL}/admin/reservations/summary`, {
       headers: internalHeaders,
       signal: AbortSignal.timeout(3000),
     }).then(async (res) => {
-      if (!res.ok) throw new Error(`Booking error: ${res.status}`);
-      return res.json() as Promise<{ data: any[]; pagination?: any }>;
+      if (!res.ok) throw new Error(`Booking summary error: ${res.status}`);
+      return res.json() as Promise<{
+        data: {
+          upcomingReservations: number;
+          availableTables: number;
+        };
+      }>;
     }),
 
-    // Booking Tables
-    fetch(`${env.BOOKING_SERVICE_URL}/admin/tables`, {
-      headers: internalHeaders,
-      signal: AbortSignal.timeout(3000),
-    }).then(async (res) => {
-      if (!res.ok) throw new Error(`Tables error: ${res.status}`);
-      return res.json() as Promise<{ data: any[]; pagination?: any }>;
-    }),
-
-    // Catalog Menu Items
-    fetch(`${env.CATALOG_SERVICE_URL}/menu/items`, {
+    // Catalog Menu Items (for enriching dish names, photos, prices)
+    fetch(`${env.CATALOG_SERVICE_URL}/menu/items?limit=100`, {
       headers: internalHeaders,
       signal: AbortSignal.timeout(3000),
     }).then(async (res) => {
@@ -46,24 +49,36 @@ export async function getAggregatedDashboard(_request: Request, response: Respon
     }),
   ]);
 
-  const [ordersRes, reservationsRes, tablesRes, catalogRes] = results;
+  const [ordersRes, bookingRes, catalogRes] = results;
 
-  const ordersData = ordersRes.status === 'fulfilled' ? ordersRes.value.data : [];
-  const reservationsData = reservationsRes.status === 'fulfilled' ? reservationsRes.value.data : [];
-  const tablesData = tablesRes.status === 'fulfilled' ? tablesRes.value.data : [];
+  const ordersSummary = ordersRes.status === 'fulfilled' ? ordersRes.value.data : null;
+  const bookingSummary = bookingRes.status === 'fulfilled' ? bookingRes.value.data : null;
   const catalogData = catalogRes.status === 'fulfilled' ? catalogRes.value.data : [];
 
-  const todayRevenue = ordersData.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0);
-  const todayOrders = ordersData.length;
-  const upcomingReservations = reservationsData.filter(
-    (r: any) => r.status === 'PENDING' || r.status === 'CONFIRMED',
-  ).length;
-  const availableTables = tablesData.filter((t: any) => t.isAvailable).length;
+  const todayRevenue = ordersSummary?.todayRevenue ?? 0;
+  const todayOrders = ordersSummary?.todayOrders ?? 0;
+  const recentOrders = ordersSummary?.recentOrders ?? [];
+  const upcomingReservations = bookingSummary?.upcomingReservations ?? 0;
+  const availableTables = bookingSummary?.availableTables ?? 0;
+
+  // Build real popular dishes enriched with catalog images
+  const popularMenuItems = (ordersSummary?.popularMenuItems ?? [])
+    .map((pop) => {
+      const catalogItem = catalogData.find((ci: any) => ci.id === pop.menuItemId);
+      return {
+        menuItem: catalogItem ?? {
+          id: pop.menuItemId,
+          name: pop.name,
+          imageUrl: '',
+        },
+        quantity: pop.quantity,
+      };
+    })
+    .filter((entry) => Boolean(entry.menuItem));
 
   const partialFailures = [
     ordersRes.status === 'rejected' ? 'orders' : null,
-    reservationsRes.status === 'rejected' ? 'reservations' : null,
-    tablesRes.status === 'rejected' ? 'tables' : null,
+    bookingRes.status === 'rejected' ? 'booking' : null,
     catalogRes.status === 'rejected' ? 'catalog' : null,
   ].filter(Boolean);
 
@@ -78,11 +93,8 @@ export async function getAggregatedDashboard(_request: Request, response: Respon
       todayOrders,
       upcomingReservations,
       availableTables,
-      recentOrders: ordersData.slice(0, 5),
-      popularMenuItems: catalogData.slice(0, 5).map((item: any) => ({
-        menuItem: item,
-        quantity: 1,
-      })),
+      recentOrders,
+      popularMenuItems,
       timezone: 'UTC',
       status: partialFailures.length === 0 ? 'healthy' : 'partial',
       degradedServices: partialFailures,
@@ -100,32 +112,32 @@ export async function getAggregatedHealthReady(_request: Request, response: Resp
     { name: 'notify', url: `${env.NOTIFY_SERVICE_URL}/health/ready` },
   ];
 
-  const results = await Promise.allSettled(
-    services.map(async (svc) => {
-      const res = await fetch(svc.url, { signal: AbortSignal.timeout(2000) });
-      if (!res.ok) throw new Error(`${svc.name} reported ${res.status}`);
-      return { name: svc.name, status: 'ready' };
+  const checks = await Promise.allSettled(
+    services.map(async ({ name, url }) => {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return { name, status: 'ready' };
     }),
   );
 
-  const checks: Record<string, string> = {};
-  let allReady = true;
+  const statuses: Record<string, string> = { gateway: 'ready' };
+  let allHealthy = true;
 
-  services.forEach((svc, index) => {
-    const outcome = results[index];
-    if (outcome && outcome.status === 'fulfilled') {
-      checks[svc.name] = 'ready';
+  checks.forEach((check, index) => {
+    const serviceName = services[index]?.name ?? 'unknown';
+    if (check.status === 'fulfilled') {
+      statuses[serviceName] = 'ready';
     } else {
-      checks[svc.name] = 'unavailable';
-      allReady = false;
+      statuses[serviceName] = 'unavailable';
+      allHealthy = false;
+      logger.warn(
+        { service: serviceName, error: errorContext(check.reason) },
+        'Downstream service readiness check failed',
+      );
     }
   });
 
-  const statusCode = allReady ? 200 : 503;
-  return response.status(statusCode).json({
-    status: allReady ? 'ready' : 'degraded',
-    service: 'gateway',
-    downstream: checks,
-  });
+  return response
+    .status(allHealthy ? 200 : 503)
+    .json({ status: allHealthy ? 'ready' : 'degraded', services: statuses });
 }
-

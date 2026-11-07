@@ -109,6 +109,45 @@ export async function sendOrderNotificationEmail(input: {
   }
 }
 
+export async function sendOrderStatusNotificationEmail(input: {
+  to: string;
+  orderId: string;
+  customerName: string;
+  status: string;
+}) {
+  if (env.NODE_ENV === 'test') {
+    lastTestNotification = { type: 'order.status_updated', to: input.to, payload: input };
+    return;
+  }
+  if (!transporter || !env.EMAIL_USER) {
+    logger.warn(
+      `[DEV EMAIL NOTIFICATION] Email delivery is not configured. Order status update for ${input.to}: Order #${input.orderId} is now ${input.status}`,
+    );
+    return;
+  }
+
+  const subject = `Order #${input.orderId.slice(0, 8)} Status Update: ${input.status} - OrderFirst`;
+  const text = `Hi ${input.customerName},\n\nYour order #${input.orderId.slice(0, 8)} status has been updated to: ${input.status}.\n\nThank you for choosing OrderFirst!`;
+  const html = `<p>Hi ${input.customerName},</p><p>Your order <strong>#${input.orderId.slice(0, 8)}</strong> status has been updated to: <span style="font-weight:bold;color:#2F4A3A;">${input.status}</span>.</p><p>Thank you for choosing OrderFirst!</p>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: env.EMAIL_USER,
+      to: input.to,
+      subject,
+      text,
+      html,
+    });
+    logger.info({ messageId: info.messageId }, 'Order status notification email sent');
+  } catch (error) {
+    logger.error(
+      { error: errorContext(error) },
+      'Order status notification email delivery failed',
+    );
+    throw error;
+  }
+}
+
 export async function sendBookingNotificationEmail(input: {
   to: string;
   booking: BookingConfirmationInput;

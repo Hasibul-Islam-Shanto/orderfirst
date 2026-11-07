@@ -44,6 +44,18 @@ const envSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     INTERNAL_SECRET: z.string().min(16).optional(),
     RABBITMQ_URL: z.string().url().default('amqp://guest:guest@localhost:5672'),
+    RATE_LIMIT_ENABLED: z
+      .preprocess((val) => {
+        if (val === undefined || val === null || val === '') return undefined;
+        if (typeof val === 'string') {
+          const trimmed = val.trim().toLowerCase();
+          if (trimmed === 'false' || trimmed === '0' || trimmed === 'off' || trimmed === 'no') return false;
+          if (trimmed === 'true' || trimmed === '1' || trimmed === 'on' || trimmed === 'yes') return true;
+          return undefined;
+        }
+        if (typeof val === 'boolean') return val;
+        return undefined;
+      }, z.boolean().optional()),
   })
   .superRefine((values, context) => {
     if (values.NODE_ENV === 'production') {
@@ -62,6 +74,22 @@ const envSchema = z
     }
   });
 
+function cleanEmptyStrings(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const cleaned: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed !== '') {
+        cleaned[key] = trimmed;
+      }
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 function normalizeEmailSetting(value: string | undefined) {
   const v = value?.trim().replace(/^["']|["']$/g, '');
   return v ? v : undefined;
@@ -76,18 +104,21 @@ function normalizeAppPassword(value: string | undefined) {
 }
 
 export function parseEnvironment(source: NodeJS.ProcessEnv) {
+  const cleaned = cleanEmptyStrings(source);
   const result = envSchema.safeParse({
-    ...source,
-    DATABASE_URL: source.DATABASE_URL || source.DATABASE_URL_AUTH,
-    EMAIL_USER: normalizeEmailSetting(source.EMAIL_USER),
-    EMAIL_APP_PASSWORD: normalizeAppPassword(source.EMAIL_APP_PASSWORD),
+    ...cleaned,
+    DATABASE_URL: cleaned.DATABASE_URL || cleaned.DATABASE_URL_AUTH,
+    EMAIL_USER: normalizeEmailSetting(cleaned.EMAIL_USER),
+    EMAIL_APP_PASSWORD: normalizeAppPassword(cleaned.EMAIL_APP_PASSWORD),
   });
   if (!result.success)
     throw new Error(
       `Invalid environment configuration: ${result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`,
     );
+  const isProduction = result.data.NODE_ENV === 'production';
   return {
     ...result.data,
+    RATE_LIMIT_ENABLED: result.data.RATE_LIMIT_ENABLED ?? isProduction,
     FRONTEND_URL: new URL(result.data.FRONTEND_URL).origin,
   };
 }

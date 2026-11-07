@@ -1,20 +1,70 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, CalendarDays, LogOut, ArrowRight } from "lucide-react";
-import { useCurrentUser, useLogout } from "../auth/auth-hooks";
+import { ShoppingBag, CalendarDays, LogOut, ArrowRight, UserPen, KeyRound } from "lucide-react";
+import { useCurrentUser, useLogout, useUpdateProfile, useChangePassword } from "../auth/auth-hooks";
 import { useMyOrders } from "../orders/order-hooks";
 import { useMyReservations } from "../reservations/reservation-hooks";
 import { isUpcoming } from "../../lib/reservation-availability";
-import { PageHeader, Badge } from "../../components/common/ui";
+import { PageHeader, Badge, Modal, useToast } from "../../components/common/ui";
 import { dateLabel, money } from "../../utils/format";
+
 export function ProfilePage() {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
   const orderQuery = useMyOrders();
   const reservationQuery = useMyReservations();
   const navigate = useNavigate();
+  const toast = useToast();
+
+  const [editNameOpen, setEditNameOpen] = useState(false);
+  const [nameInput, setNameInput] = useState(user?.name ?? "");
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   if (!user) return null;
   const orders = orderQuery.data?.data ?? [];
   const upcoming = (reservationQuery.data?.data ?? []).filter(isUpcoming);
+
+  const handleUpdateName = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nameInput.trim()) return;
+    updateProfile.mutate(
+      { name: nameInput.trim() },
+      {
+        onSuccess: () => {
+          toast("Profile name updated successfully");
+          setEditNameOpen(false);
+        },
+        onError: (err) => toast(err.message),
+      },
+    );
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters");
+      return;
+    }
+    setPasswordError(null);
+    changePassword.mutate(
+      { currentPassword, newPassword },
+      {
+        onSuccess: () => {
+          toast("Password changed successfully");
+          setPasswordOpen(false);
+          setCurrentPassword("");
+          setNewPassword("");
+        },
+        onError: (err) => setPasswordError(err.message),
+      },
+    );
+  };
+
   return (
     <div className="shell page">
       <PageHeader
@@ -35,14 +85,36 @@ export function ProfilePage() {
           <p className="muted">{user.email}</p>
           <Badge status={user.role} />
           <div className="summary-divider" />
-          <button
-            className="button secondary"
-            onClick={() => {
-              logout.mutate(undefined, { onSuccess: () => navigate("/") });
-            }}
-          >
-            <LogOut size={17} /> Log out
-          </button>
+          <div className="button-col" style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%" }}>
+            <button
+              className="button secondary small"
+              onClick={() => {
+                setNameInput(user.name);
+                setEditNameOpen(true);
+              }}
+            >
+              <UserPen size={16} /> Edit profile name
+            </button>
+            <button
+              className="button secondary small"
+              onClick={() => {
+                setPasswordError(null);
+                setCurrentPassword("");
+                setNewPassword("");
+                setPasswordOpen(true);
+              }}
+            >
+              <KeyRound size={16} /> Change password
+            </button>
+            <button
+              className="button secondary small"
+              onClick={() => {
+                logout.mutate(undefined, { onSuccess: () => navigate("/") });
+              }}
+            >
+              <LogOut size={16} /> Log out
+            </button>
+          </div>
         </div>
         <div className="profile-sections">
           <div className="panel">
@@ -93,6 +165,67 @@ export function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {editNameOpen && (
+        <Modal title="Edit Profile Name" onClose={() => setEditNameOpen(false)}>
+          <form onSubmit={handleUpdateName} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <label>
+              <span className="small-text muted">Full Name</span>
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                required
+                style={{ width: "100%", marginTop: "0.25rem" }}
+              />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button type="button" className="button secondary" onClick={() => setEditNameOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="button" disabled={updateProfile.isPending}>
+                Save changes
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {passwordOpen && (
+        <Modal title="Change Password" onClose={() => setPasswordOpen(false)}>
+          <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <label>
+              <span className="small-text muted">Current Password</span>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                style={{ width: "100%", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label>
+              <span className="small-text muted">New Password (at least 8 characters)</span>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                style={{ width: "100%", marginTop: "0.25rem" }}
+              />
+            </label>
+            {passwordError && <p className="field-error">{passwordError}</p>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button type="button" className="button secondary" onClick={() => setPasswordOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="button" disabled={changePassword.isPending}>
+                Update password
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Check, ArrowRight, Clock } from "lucide-react";
-import { useMyOrders, useOrderDetails } from "./order-hooks";
+import { useMyOrders, useOrderDetails, useCancelOrder } from "./order-hooks";
 import {
   Badge,
   EmptyState,
   PageHeader,
   Modal,
+  ConfirmDialog,
+  useToast,
 } from "../../components/common/ui";
 import { dateLabel, money } from "../../utils/format";
 import type { Order } from "../../types";
@@ -53,7 +55,10 @@ export function OrderDetails({ order }: { order: Order }) {
 }
 export function OrdersPage() {
   const query = useMyOrders();
+  const cancelMutation = useCancelOrder();
+  const toast = useToast();
   const [detail, setDetail] = useState<Order | null>(null);
+  const [cancel, setCancel] = useState<Order | null>(null);
   const orders = query.data?.data ?? [];
   return (
     <div className="shell page">
@@ -107,12 +112,22 @@ export function OrdersPage() {
                     </p>
                     <div className="order-card-bottom">
                       <strong>{money(o.total)}</strong>
-                      <button
-                        className="text-link"
-                        onClick={() => setDetail(o)}
-                      >
-                        View details <ArrowRight size={17} />
-                      </button>
+                      <div className="button-row">
+                        {o.status === "Pending" && (
+                          <button
+                            className="text-link danger-text"
+                            onClick={() => setCancel(o)}
+                          >
+                            Cancel order
+                          </button>
+                        )}
+                        <button
+                          className="text-link"
+                          onClick={() => setDetail(o)}
+                        >
+                          View details <ArrowRight size={17} />
+                        </button>
+                      </div>
                     </div>
                   </article>
                 ))
@@ -130,7 +145,34 @@ export function OrdersPage() {
       {detail && (
         <Modal title={`Order ${detail.id}`} onClose={() => setDetail(null)}>
           <OrderDetails order={detail} />
+          {detail.status === "Pending" && (
+            <div style={{ marginTop: "1rem" }}>
+              <button
+                className="button secondary danger-text"
+                onClick={() => {
+                  setCancel(detail);
+                  setDetail(null);
+                }}
+              >
+                Cancel this order
+              </button>
+            </div>
+          )}
         </Modal>
+      )}
+      {cancel && (
+        <ConfirmDialog
+          title="Cancel order?"
+          description={`Are you sure you want to cancel order #${cancel.id.slice(0, 8)}? Our kitchen hasn't started cooking yet.`}
+          onClose={() => setCancel(null)}
+          onConfirm={() => {
+            cancelMutation.mutate(cancel.id, {
+              onSuccess: () => toast("Order cancelled successfully."),
+              onError: (err) => toast(err.message),
+            });
+            setCancel(null);
+          }}
+        />
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseEnvironment } from '../src/config/env.js';
 import {
   menuListRequest,
   updateMenuItemRequest,
@@ -104,6 +105,20 @@ describe('Catalog validation invariants', () => {
         body: { ids: ['invalid-uuid'] },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('Catalog environment configuration', () => {
+  it('gracefully handles empty-string environment variables without failing validation', () => {
+    const parsed = parseEnvironment({
+      DATABASE_URL: 'postgresql://catalog_user:catalog_pass@localhost:5432/orderfirst?schema=catalog',
+      INTERNAL_SECRET: '',
+      JWT_SECRET: '',
+      FRONTEND_URL: '',
+    });
+    expect(parsed.INTERNAL_SECRET).toBeUndefined();
+    expect(parsed.JWT_SECRET).toBe('default-jwt-secret-for-catalog-min-32-chars-long');
+    expect(parsed.FRONTEND_URL).toBe('http://localhost:5173');
   });
 });
 

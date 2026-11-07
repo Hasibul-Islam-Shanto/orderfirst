@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
+import { parseEnvironment } from '../src/config/env.js';
 import { createApp } from '../src/app.js';
 import { buildVerificationEmailContent } from '../src/templates/verification-email.template.js';
 import { errorContext } from '../src/config/logger.js';
@@ -29,6 +30,17 @@ describe('Notify service unit and template checks', () => {
     const ctx = errorContext(err);
     const serialized = JSON.stringify(ctx);
     expect(serialized).not.toContain('secret');
+  });
+
+  it('gracefully handles empty-string environment variables without failing validation', () => {
+    const parsed = parseEnvironment({
+      EMAIL_USER: '',
+      EMAIL_APP_PASSWORD: '',
+      RABBITMQ_URL: '',
+    });
+    expect(parsed.EMAIL_USER).toBeUndefined();
+    expect(parsed.EMAIL_APP_PASSWORD).toBeUndefined();
+    expect(parsed.RABBITMQ_URL).toBe('amqp://guest:guest@localhost:5672');
   });
 });
 

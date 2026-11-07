@@ -39,3 +39,16 @@ export const resendVerificationRequest = z.object({
   body: z.strictObject({}),
 });
 
+export const updateProfileRequest = z.object({
+  body: z.strictObject({
+    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(80),
+  }),
+});
+
+export const changePasswordRequest = z.object({
+  body: z.strictObject({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: password,
+  }),
+});
+

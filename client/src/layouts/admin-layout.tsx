@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Logo, ThemeToggle, Modal } from "../components/common/ui";
 import { useCurrentUser, useLogout } from "../features/auth/auth-hooks";
+import { useEventStream } from "../lib/use-event-stream";
 const links = [
   { path: "overview", label: "Overview", icon: LayoutDashboard },
   { path: "menu", label: "Menu", icon: UtensilsCrossed },
@@ -22,6 +23,7 @@ const links = [
 export function AdminLayout() {
   const [open, setOpen] = useState(false);
   const { data: user } = useCurrentUser();
+  useEventStream(user);
   const logout = useLogout();
   const navigate = useNavigate();
   const navigation = (
@@ -72,7 +74,16 @@ export function AdminLayout() {
             <ThemeToggle />
             <details className="user-dropdown">
               <summary>
-                <span className="mini-avatar">JT</span>
+                <span className="mini-avatar">
+                  {user?.name
+                    ? user.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase()
+                    : "AD"}
+                </span>
                 <span>
                   {user?.name}
                   <small>Administrator</small>

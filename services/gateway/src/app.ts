@@ -22,6 +22,7 @@ import {
   getAggregatedDashboard,
   getAggregatedHealthReady,
 } from './aggregation/dashboard.js';
+import { handleEventsStream } from './events/sse.js';
 
 export function createApp() {
   const app = express();
@@ -95,6 +96,9 @@ export function createApp() {
     requireAdmin,
     getAggregatedDashboard,
   );
+
+  // Live SSE stream endpoint for realtime updates
+  app.get(['/api/events/stream', '/events/stream'], handleEventsStream);
 
   // Body parser for JSON payloads up to 32kb
   app.use(express.json({ limit: '32kb' }));
