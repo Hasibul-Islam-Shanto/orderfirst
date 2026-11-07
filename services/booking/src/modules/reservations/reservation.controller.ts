@@ -117,3 +117,16 @@ export async function updateReservationStatus(
   );
 }
 
+export async function getBookingSummary(
+  _request: Request,
+  response: Response,
+) {
+  const summary = await service.getBookingSummary();
+  return sendSuccess(
+    response,
+    summary,
+    'Booking summary retrieved successfully',
+  );
+}
+
+

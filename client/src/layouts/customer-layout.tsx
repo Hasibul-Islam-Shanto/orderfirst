@@ -11,6 +11,7 @@ import {
 import { Logo, ThemeToggle, Modal } from "../components/common/ui";
 import { useCurrentUser } from "../features/auth/auth-hooks";
 import { useCart } from "../store/cart-store";
+import { useEventStream } from "../lib/use-event-stream";
 const links = [
   ["/", "Home"],
   ["/menu", "Our menu"],
@@ -19,6 +20,7 @@ const links = [
 export function CustomerLayout() {
   const [mobile, setMobile] = useState(false);
   const { data: user } = useCurrentUser();
+  useEventStream(user);
   const count = useCart((s) => s.items.reduce((n, i) => n + i.quantity, 0));
   const nav = (
     <>

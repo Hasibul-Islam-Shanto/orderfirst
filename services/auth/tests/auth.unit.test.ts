@@ -107,6 +107,65 @@ describe('Auth validation and session invariants', () => {
     ).toThrow('Production requires HTTPS');
   });
 
+  it('correctly defaults and parses RATE_LIMIT_ENABLED for development and production', () => {
+    const baseDev = {
+      DATABASE_URL: 'postgresql://user:pass@localhost/db',
+      JWT_SECRET: 'a'.repeat(32),
+      FRONTEND_URL: 'http://localhost:5173',
+    };
+    const baseProd = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://user:pass@localhost/db',
+      JWT_SECRET: 'a'.repeat(32),
+      FRONTEND_URL: 'https://app.orderfirst.dev',
+      EMAIL_USER: 'admin@example.com',
+      EMAIL_APP_PASSWORD: 'app-password',
+    };
+
+    // Default false in development
+    expect(parseEnvironment(baseDev).RATE_LIMIT_ENABLED).toBe(false);
+
+    // Default true in production
+    expect(parseEnvironment(baseProd).RATE_LIMIT_ENABLED).toBe(true);
+
+    // Explicit override in development
+    expect(
+      parseEnvironment({ ...baseDev, RATE_LIMIT_ENABLED: 'true' })
+        .RATE_LIMIT_ENABLED,
+    ).toBe(true);
+
+    // Explicit override in production
+    expect(
+      parseEnvironment({ ...baseProd, RATE_LIMIT_ENABLED: 'false' })
+        .RATE_LIMIT_ENABLED,
+    ).toBe(false);
+
+    // Empty string from docker compose parameter expansion defaults correctly
+    expect(
+      parseEnvironment({ ...baseDev, RATE_LIMIT_ENABLED: '' })
+        .RATE_LIMIT_ENABLED,
+    ).toBe(false);
+    expect(
+      parseEnvironment({ ...baseProd, RATE_LIMIT_ENABLED: '' })
+        .RATE_LIMIT_ENABLED,
+    ).toBe(true);
+  });
+
+  it('gracefully handles empty-string environment variables without failing validation', () => {
+    const baseDev = {
+      DATABASE_URL: 'postgresql://user:pass@localhost:5432/db?schema=auth',
+      JWT_SECRET: 'test-secret-at-least-32-characters-long',
+      FRONTEND_URL: 'http://localhost:5173',
+      INTERNAL_SECRET: '',
+      EMAIL_USER: '',
+      EMAIL_APP_PASSWORD: '',
+      RATE_LIMIT_ENABLED: '',
+    };
+    const parsed = parseEnvironment(baseDev);
+    expect(parsed.INTERNAL_SECRET).toBeUndefined();
+    expect(parsed.RATE_LIMIT_ENABLED).toBe(false);
+  });
+
   it('issues an HTTP-only expiring JWT cookie and rejects tampered tokens', () => {
     const cookie = vi.fn();
     const response = { cookie } as unknown as Response;
@@ -122,6 +181,25 @@ describe('Auth validation and session invariants', () => {
       path: '/',
       maxAge: 86400000,
     });
+  });
+
+  it('embeds user role, name, and email in JWT claims when user object is provided', () => {
+    const cookie = vi.fn();
+    const response = { cookie } as unknown as Response;
+    setSessionCookie(response, {
+      id: resourceId,
+      role: 'ADMIN',
+      name: 'Admin User',
+      email: 'admin@orderfirst.dev',
+    });
+    const token = cookie.mock.calls[0]?.[1];
+    expect(typeof token).toBe('string');
+    const jwt = require('jsonwebtoken');
+    const payload = jwt.decode(token) as Record<string, unknown>;
+    expect(payload.sub).toBe(resourceId);
+    expect(payload.role).toBe('ADMIN');
+    expect(payload.name).toBe('Admin User');
+    expect(payload.email).toBe('admin@orderfirst.dev');
   });
 
   it('does not log sensitive multiline error messages as stack traces', async () => {

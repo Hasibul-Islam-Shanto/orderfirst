@@ -23,7 +23,11 @@ export const protectCookieRequests: RequestHandler = (
   next();
 };
 
-export function createAuthRateLimit() {
+export function createAuthRateLimit(): RequestHandler {
+  if (!env.RATE_LIMIT_ENABLED) {
+    return (_request, _response, next) => next();
+  }
+
   return rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: env.NODE_ENV === 'test' ? 1000 : 20,

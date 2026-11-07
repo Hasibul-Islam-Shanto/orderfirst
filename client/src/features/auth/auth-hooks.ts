@@ -64,6 +64,22 @@ export function useLogout() {
   });
 }
 
+export function useUpdateProfile() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string }) =>
+      mapUser((await apiClient.patch<ApiResponse<ApiUser>>("/auth/profile", input)).data),
+    onSuccess: (user) => client.setQueryData(queryKeys.auth.current, user),
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; newPassword: string }) =>
+      apiClient.post<ApiResponse<null>>("/auth/change-password", input),
+  });
+}
+
 export function isUnauthenticated(error: unknown) {
   return error instanceof ApiError && error.status === 401;
 }

@@ -60,6 +60,13 @@ reservationRouter.patch(
 export const adminReservationRouter = Router();
 
 adminReservationRouter.get(
+  '/summary',
+  authenticateUser,
+  authorizeRoles('ADMIN'),
+  controller.getBookingSummary,
+);
+
+adminReservationRouter.get(
   '/',
   authenticateUser,
   authorizeRoles('ADMIN'),

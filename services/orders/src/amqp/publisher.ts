@@ -38,6 +38,8 @@ export async function getAmqpChannel(): Promise<amqplib.Channel | null> {
 
 export interface OrderCreatedEvent {
   orderId: string;
+  userId: string;
+  status: string;
   customerEmail: string;
   customerName: string;
   total: string | number;
@@ -48,7 +50,17 @@ export interface OrderCreatedEvent {
   }>;
 }
 
+export interface OrderStatusUpdatedEvent {
+  orderId: string;
+  userId: string;
+  status: string;
+  previousStatus?: string;
+  customerEmail: string;
+  customerName: string;
+}
+
 export let lastPublishedOrder: OrderCreatedEvent | undefined;
+export let lastPublishedStatusUpdate: OrderStatusUpdatedEvent | undefined;
 
 export function publishOrderCreated(event: OrderCreatedEvent): void {
   lastPublishedOrder = event;
@@ -74,6 +86,35 @@ export function publishOrderCreated(event: OrderCreatedEvent): void {
       logger.error(
         { orderId: event.orderId, error: errorContext(error) },
         'Failed to publish order.created event',
+      );
+    }
+  });
+}
+
+export function publishOrderStatusUpdated(event: OrderStatusUpdatedEvent): void {
+  lastPublishedStatusUpdate = event;
+  setImmediate(async () => {
+    try {
+      const ch = await getAmqpChannel();
+      if (!ch) {
+        logger.warn({ orderId: event.orderId }, 'Skipping order status publish: AMQP channel not ready');
+        return;
+      }
+      const message = Buffer.from(JSON.stringify(event));
+      const requestId = getRequestId();
+      ch.publish(EXCHANGE, 'order.status_updated', message, {
+        persistent: true,
+        contentType: 'application/json',
+        ...(requestId ? { correlationId: requestId } : {}),
+        headers: {
+          ...(requestId ? { 'x-request-id': requestId } : {}),
+        },
+      });
+      logger.info({ orderId: event.orderId, status: event.status }, 'Published order.status_updated event');
+    } catch (error) {
+      logger.error(
+        { orderId: event.orderId, error: errorContext(error) },
+        'Failed to publish order.status_updated event',
       );
     }
   });

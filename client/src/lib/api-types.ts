@@ -56,39 +56,47 @@ export interface ApiOrderItem {
   id: string;
   quantity: number;
   unitPrice: string | number;
-  menuItem: { id: string; name: string; imageUrl: string };
+  menuItemId?: string;
+  menuItemName?: string;
+  menuItem?: { id: string; name: string; imageUrl?: string };
 }
 export interface ApiOrder {
   id: string;
   userId: string;
+  customerName?: string;
+  customerEmail?: string;
   user?: ApiUser;
   status: string;
   orderType: "DINE_IN" | "PICKUP";
   total: string | number;
   notes: string | null;
   createdAt: string;
-  items: ApiOrderItem[];
+  items?: ApiOrderItem[];
 }
 export interface ApiReservation {
   id: string;
   userId: string;
+  customerName?: string;
+  customerEmail?: string;
   user?: ApiUser;
   restaurantTableId: string;
-  restaurantTable: ApiTable;
+  restaurantTable?: ApiTable;
   reservationDate: string;
   guestCount: number;
   specialRequest: string | null;
   status: string;
 }
 
-const title = (value: string) =>
+const title = (value?: string) =>
   value
-    .toLowerCase()
-    .replace(
-      /(^|_)(\w)/g,
-      (_, __, letter: string) => `${_ ? " " : ""}${letter.toUpperCase()}`,
-    )
-    .trim();
+    ? value
+        .toLowerCase()
+        .replace(
+          /(^|_)(\w)/g,
+          (_, __, letter: string) => `${_ ? " " : ""}${letter.toUpperCase()}`,
+        )
+        .trim()
+    : "";
 export const mapUser = (user: ApiUser): User => ({
   ...user,
   role: user.role.toLowerCase() as User["role"],
@@ -121,24 +129,29 @@ export const mapTable = (table: ApiTable): RestaurantTable => ({
 export const mapOrder = (order: ApiOrder): Order => ({
   id: order.id,
   userId: order.userId,
-  customer: order.user?.name ?? "You",
+  customer: order.customerName ?? order.user?.name ?? "Guest",
   phone: "",
-  items: order.items.map((line) => ({
-    quantity: line.quantity,
-    item: {
-      id: line.menuItem.id,
-      name: line.menuItem.name,
-      description: "",
-      price: Number(line.unitPrice),
-      image: line.menuItem.imageUrl,
-      categoryId: "",
-      available: true,
-      featured: false,
-      prepTime: 0,
-      rating: 0,
-      vegetarian: false,
-    },
-  })),
+  items: (order.items ?? []).map((line) => {
+    const itemId = line.menuItem?.id ?? line.menuItemId ?? line.id;
+    const itemName = line.menuItem?.name ?? line.menuItemName ?? "Menu Item";
+    const itemImage = line.menuItem?.imageUrl ?? "";
+    return {
+      quantity: line.quantity,
+      item: {
+        id: itemId,
+        name: itemName,
+        description: "",
+        price: Number(line.unitPrice),
+        image: itemImage,
+        categoryId: "",
+        available: true,
+        featured: false,
+        prepTime: 0,
+        rating: 0,
+        vegetarian: false,
+      },
+    };
+  }),
   total: Number(order.total),
   date: order.createdAt,
   status: title(order.status) as Order["status"],
@@ -150,7 +163,7 @@ export const mapReservation = (reservation: ApiReservation): Reservation => {
   return {
     id: reservation.id,
     userId: reservation.userId,
-    customer: reservation.user?.name ?? "You",
+    customer: reservation.customerName ?? reservation.user?.name ?? "Guest",
     date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
     time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
     guests: reservation.guestCount,

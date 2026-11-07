@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseEnvironment } from '../src/config/env.js';
 import { Prisma } from '@prisma/client';
 import { createOrderRequest } from '../src/modules/orders/order.validation.js';
 import { calculateOrderTotal } from '../src/modules/orders/order.service.js';
@@ -50,6 +51,24 @@ describe('Orders service validation and monetary calculation', () => {
     expect(orderTransitions.READY).toContain('CANCELLED');
     expect(orderTransitions.COMPLETED).toHaveLength(0);
     expect(orderTransitions.CANCELLED).toHaveLength(0);
+  });
+});
+
+describe('Orders environment configuration', () => {
+  it('gracefully handles empty-string environment variables without failing validation', () => {
+    const parsed = parseEnvironment({
+      DATABASE_URL: 'postgresql://orders_user:orders_pass@localhost:5432/orderfirst?schema=orders',
+      INTERNAL_SECRET: '',
+      JWT_SECRET: '',
+      CATALOG_SERVICE_URL: '',
+      FRONTEND_URL: '',
+      RABBITMQ_URL: '',
+    });
+    expect(parsed.INTERNAL_SECRET).toBeUndefined();
+    expect(parsed.JWT_SECRET).toBe('default-jwt-secret-for-orders-min-32-chars-long');
+    expect(parsed.CATALOG_SERVICE_URL).toBe('http://localhost:4002');
+    expect(parsed.FRONTEND_URL).toBe('http://localhost:5173');
+    expect(parsed.RABBITMQ_URL).toBe('amqp://guest:guest@localhost:5672');
   });
 });
 

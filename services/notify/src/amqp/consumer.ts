@@ -4,6 +4,7 @@ import { logger, errorContext } from '../config/logger.js';
 import {
   sendNotificationEmail,
   sendOrderNotificationEmail,
+  sendOrderStatusNotificationEmail,
   sendBookingNotificationEmail,
 } from '../config/mail.js';
 import { defaultIdempotencyStore } from '../utils/idempotency.js';
@@ -169,8 +170,24 @@ export async function startNotificationConsumer(): Promise<void> {
 
     await channel.consume(
       QUEUE_ORDER,
-      (msg) =>
-        handleDelivery<{
+      (msg) => {
+        const routingKey = msg?.fields.routingKey;
+        if (routingKey === 'order.status_updated') {
+          return handleDelivery<{
+            orderId: string;
+            customerEmail: string;
+            customerName: string;
+            status: string;
+          }>(msg, 'order.status_updated', async (data) => {
+            await sendOrderStatusNotificationEmail({
+              to: data.customerEmail,
+              orderId: data.orderId,
+              customerName: data.customerName,
+              status: data.status,
+            });
+          });
+        }
+        return handleDelivery<{
           orderId: string;
           customerEmail: string;
           customerName: string;
@@ -186,7 +203,8 @@ export async function startNotificationConsumer(): Promise<void> {
               items: data.items,
             },
           });
-        }),
+        });
+      },
       { noAck: false },
     );
 

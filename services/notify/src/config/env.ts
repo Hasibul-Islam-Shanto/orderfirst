@@ -29,6 +29,22 @@ const envSchema = z
       .default('info'),
   });
 
+function cleanEmptyStrings(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const cleaned: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed !== '') {
+        cleaned[key] = trimmed;
+      }
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 function normalizeEmailSetting(value: string | undefined) {
   const v = value?.trim().replace(/^["']|["']$/g, '');
   return v ? v : undefined;
@@ -43,10 +59,11 @@ function normalizeAppPassword(value: string | undefined) {
 }
 
 export function parseEnvironment(source: NodeJS.ProcessEnv) {
+  const cleaned = cleanEmptyStrings(source);
   const result = envSchema.safeParse({
-    ...source,
-    EMAIL_USER: normalizeEmailSetting(source.EMAIL_USER),
-    EMAIL_APP_PASSWORD: normalizeAppPassword(source.EMAIL_APP_PASSWORD),
+    ...cleaned,
+    EMAIL_USER: normalizeEmailSetting(cleaned.EMAIL_USER),
+    EMAIL_APP_PASSWORD: normalizeAppPassword(cleaned.EMAIL_APP_PASSWORD),
   });
   if (!result.success)
     throw new Error(

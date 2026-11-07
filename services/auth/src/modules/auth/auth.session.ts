@@ -11,8 +11,27 @@ const cookieOptions: CookieOptions = {
   path: '/',
 };
 
-export function setSessionCookie(response: Response, userId: string) {
-  const token = jwt.sign({}, env.JWT_SECRET, {
+export interface SessionUser {
+  id: string;
+  role?: string;
+  name?: string;
+  email?: string;
+}
+
+export function setSessionCookie(
+  response: Response,
+  user: SessionUser | string,
+) {
+  const userId = typeof user === 'string' ? user : user.id;
+  const payload: Record<string, unknown> = {};
+
+  if (typeof user === 'object') {
+    if (user.role) payload.role = user.role;
+    if (user.name) payload.name = user.name;
+    if (user.email) payload.email = user.email;
+  }
+
+  const token = jwt.sign(payload, env.JWT_SECRET, {
     subject: userId,
     expiresIn: env.JWT_EXPIRES_IN,
     algorithm: 'HS256',

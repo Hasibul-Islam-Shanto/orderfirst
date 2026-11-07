@@ -22,6 +22,7 @@ import {
   getAggregatedDashboard,
   getAggregatedHealthReady,
 } from './aggregation/dashboard.js';
+import { handleEventsStream } from './events/sse.js';
 
 export function createApp() {
   const app = express();
@@ -85,7 +86,19 @@ export function createApp() {
   app.get('/health/ready', getAggregatedHealthReady);
 
   // Edge aggregation: Dashboard endpoint
-  app.get('/api/admin/dashboard', requireAdmin, getAggregatedDashboard);
+  app.get(
+    [
+      '/api/admin/dashboard',
+      '/api/admin/dashboard/summary',
+      '/admin/dashboard',
+      '/admin/dashboard/summary',
+    ],
+    requireAdmin,
+    getAggregatedDashboard,
+  );
+
+  // Live SSE stream endpoint for realtime updates
+  app.get(['/api/events/stream', '/events/stream'], handleEventsStream);
 
   // Body parser for JSON payloads up to 32kb
   app.use(express.json({ limit: '32kb' }));

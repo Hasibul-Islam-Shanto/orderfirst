@@ -86,3 +86,31 @@ export async function updateOrderStatus(
   );
 }
 
+export async function cancelOrder(
+  request: Request,
+  response: Response,
+  input: z.output<typeof validation.orderRequest>,
+) {
+  const user = requireUser(request);
+  const isAdmin = user.role === 'ADMIN';
+  const order = await service.cancelOrder(
+    user.id,
+    input.params.orderId,
+    isAdmin,
+  );
+  return sendSuccess(response, order, 'Order cancelled successfully');
+}
+
+export async function getOrdersSummary(
+  _request: Request,
+  response: Response,
+) {
+  const summary = await service.getOrdersSummary();
+  return sendSuccess(
+    response,
+    summary,
+    'Orders summary retrieved successfully',
+  );
+}
+
+

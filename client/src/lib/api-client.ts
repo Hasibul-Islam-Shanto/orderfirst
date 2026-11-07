@@ -19,7 +19,7 @@ export class ApiError extends Error implements ApiErrorShape {
   }
 }
 
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:4000/api").replace(/\/$/, "");
+export const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:4000/api").replace(/\/$/, "");
 
 type RequestOptions = Omit<RequestInit, "body" | "method" | "signal"> & {
   body?: unknown;

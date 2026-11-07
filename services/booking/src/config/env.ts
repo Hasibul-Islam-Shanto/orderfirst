@@ -32,12 +32,30 @@ const envSchema = z
       .default('info'),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     INTERNAL_SECRET: z.string().min(16).optional(),
+    RABBITMQ_URL: z.string().url().default('amqp://guest:guest@localhost:5672'),
   });
 
+function cleanEmptyStrings(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const cleaned: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed !== '') {
+        cleaned[key] = trimmed;
+      }
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 export function parseEnvironment(source: NodeJS.ProcessEnv) {
+  const cleaned = cleanEmptyStrings(source);
   const result = envSchema.safeParse({
-    ...source,
-    DATABASE_URL: source.DATABASE_URL_BOOKING || source.DATABASE_URL,
+    ...cleaned,
+    DATABASE_URL: cleaned.DATABASE_URL || cleaned.DATABASE_URL_BOOKING,
   });
   if (!result.success)
     throw new Error(

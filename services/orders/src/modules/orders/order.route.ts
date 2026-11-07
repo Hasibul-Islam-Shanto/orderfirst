@@ -30,7 +30,21 @@ orderRouter.get(
   validateRequest(validation.orderRequest, controller.getCustomerOrderById),
 );
 
+orderRouter.patch(
+  '/:orderId/cancel',
+  authenticateUser,
+  authorizeRoles('CUSTOMER', 'ADMIN'),
+  validateRequest(validation.orderRequest, controller.cancelOrder),
+);
+
 export const adminOrderRouter = Router();
+
+adminOrderRouter.get(
+  '/summary',
+  authenticateUser,
+  authorizeRoles('ADMIN'),
+  controller.getOrdersSummary,
+);
 
 adminOrderRouter.get(
   '/',

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseEnvironment } from '../src/config/env.js';
 import { createReservationRequest } from '../src/modules/reservations/reservation.validation.js';
 import { reservationConflictWhere } from '../src/modules/reservations/reservation.service.js';
 import { createTableRequest } from '../src/modules/tables/table.validation.js';
@@ -71,6 +72,20 @@ describe('Booking service validation and conflict logic', () => {
     expect(reservationTransitions.CONFIRMED).toContain('CANCELLED');
     expect(reservationTransitions.COMPLETED).toHaveLength(0);
     expect(reservationTransitions.CANCELLED).toHaveLength(0);
+  });
+});
+
+describe('Booking environment configuration', () => {
+  it('gracefully handles empty-string environment variables without failing validation', () => {
+    const parsed = parseEnvironment({
+      DATABASE_URL: 'postgresql://booking_user:booking_pass@localhost:5432/orderfirst?schema=booking',
+      INTERNAL_SECRET: '',
+      JWT_SECRET: '',
+      FRONTEND_URL: '',
+    });
+    expect(parsed.INTERNAL_SECRET).toBeUndefined();
+    expect(parsed.JWT_SECRET).toBe('default-jwt-secret-for-booking-min-32-chars-long');
+    expect(parsed.FRONTEND_URL).toBe('http://localhost:5173');
   });
 });
 

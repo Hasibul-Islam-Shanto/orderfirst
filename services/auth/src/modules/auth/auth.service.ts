@@ -226,3 +226,46 @@ export async function resendVerificationEmail(userId: string) {
   return null;
 }
 
+export async function updateProfile(
+  userId: string,
+  input: { name: string },
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+
+  return prisma.user.update({
+    where: { id: userId },
+    data: { name: input.name },
+    select: publicUserSelect,
+  });
+}
+
+export async function changePassword(
+  userId: string,
+  input: { currentPassword: string; newPassword: string },
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, passwordHash: true },
+  });
+  if (!user) throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
+
+  const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!matches) {
+    throw new AppError(400, 'Current password is incorrect', 'INVALID_CURRENT_PASSWORD');
+  }
+
+  const safePassword = truncatePassword(input.newPassword);
+  const newHash = await bcrypt.hash(safePassword, 12);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: newHash },
+  });
+
+  return { message: 'Password updated successfully' };
+}
+
+

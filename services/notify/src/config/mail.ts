@@ -18,15 +18,22 @@ export let lastTestNotification:
 const transporter =
   env.EMAIL_USER && env.EMAIL_APP_PASSWORD
     ? nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        service: 'gmail',
         auth: {
           user: env.EMAIL_USER,
           pass: env.EMAIL_APP_PASSWORD,
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
       })
     : null;
+
+if (transporter) {
+  logger.info({ user: env.EMAIL_USER }, 'Gmail SMTP transporter configured');
+} else {
+  logger.warn('Email delivery in mock mode: EMAIL_USER or EMAIL_APP_PASSWORD is not set');
+}
 
 export async function sendNotificationEmail(input: {
   to: string;
@@ -48,14 +55,17 @@ export async function sendNotificationEmail(input: {
 
   try {
     const info = await transporter.sendMail({
-      from: env.EMAIL_USER,
+      from: `"OrderFirst" <${env.EMAIL_USER}>`,
       to: input.to,
       subject: 'Verify your OrderFirst account',
       text,
       html,
     });
-    logger.info({ messageId: info.messageId }, 'Notification email sent');
+    logger.info({ messageId: info.messageId, to: input.to }, 'Notification email sent');
   } catch (error) {
+    logger.warn(
+      `[FALLBACK VERIFICATION CODE] Delivery to ${input.to} failed. Use OTP code: ${input.code}`,
+    );
     logger.error(
       { error: errorContext(error) },
       'Notification email delivery failed',
@@ -94,6 +104,45 @@ export async function sendOrderNotificationEmail(input: {
     logger.error(
       { error: errorContext(error) },
       'Order notification email delivery failed',
+    );
+    throw error;
+  }
+}
+
+export async function sendOrderStatusNotificationEmail(input: {
+  to: string;
+  orderId: string;
+  customerName: string;
+  status: string;
+}) {
+  if (env.NODE_ENV === 'test') {
+    lastTestNotification = { type: 'order.status_updated', to: input.to, payload: input };
+    return;
+  }
+  if (!transporter || !env.EMAIL_USER) {
+    logger.warn(
+      `[DEV EMAIL NOTIFICATION] Email delivery is not configured. Order status update for ${input.to}: Order #${input.orderId} is now ${input.status}`,
+    );
+    return;
+  }
+
+  const subject = `Order #${input.orderId.slice(0, 8)} Status Update: ${input.status} - OrderFirst`;
+  const text = `Hi ${input.customerName},\n\nYour order #${input.orderId.slice(0, 8)} status has been updated to: ${input.status}.\n\nThank you for choosing OrderFirst!`;
+  const html = `<p>Hi ${input.customerName},</p><p>Your order <strong>#${input.orderId.slice(0, 8)}</strong> status has been updated to: <span style="font-weight:bold;color:#2F4A3A;">${input.status}</span>.</p><p>Thank you for choosing OrderFirst!</p>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: env.EMAIL_USER,
+      to: input.to,
+      subject,
+      text,
+      html,
+    });
+    logger.info({ messageId: info.messageId }, 'Order status notification email sent');
+  } catch (error) {
+    logger.error(
+      { error: errorContext(error) },
+      'Order status notification email delivery failed',
     );
     throw error;
   }

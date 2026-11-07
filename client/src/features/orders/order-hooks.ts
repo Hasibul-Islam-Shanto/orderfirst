@@ -13,3 +13,14 @@ export function useCreateOrder() {
   const client = useQueryClient();
   return useMutation({ mutationFn: async (input: { orderType: "DINE_IN" | "PICKUP"; notes?: string; items: { menuItemId: string; quantity: number }[] }) => mapOrder((await apiClient.post<ApiResponse<ApiOrder>>("/orders", input)).data), onSuccess: (order) => { client.invalidateQueries({ queryKey: queryKeys.orders.all }); client.setQueryData(queryKeys.orders.detail(order.id), order); } });
 }
+export function useCancelOrder() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      mapOrder((await apiClient.patch<ApiResponse<ApiOrder>>(`/orders/${id}/cancel`)).data),
+    onSuccess: (order) => {
+      client.invalidateQueries({ queryKey: queryKeys.orders.all });
+      client.setQueryData(queryKeys.orders.detail(order.id), order);
+    },
+  });
+}
