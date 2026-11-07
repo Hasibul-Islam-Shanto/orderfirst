@@ -78,7 +78,7 @@ function normalizeAppPassword(value: string | undefined) {
 export function parseEnvironment(source: NodeJS.ProcessEnv) {
   const result = envSchema.safeParse({
     ...source,
-    DATABASE_URL: source.DATABASE_URL_AUTH || source.DATABASE_URL,
+    DATABASE_URL: source.DATABASE_URL || source.DATABASE_URL_AUTH,
     EMAIL_USER: normalizeEmailSetting(source.EMAIL_USER),
     EMAIL_APP_PASSWORD: normalizeAppPassword(source.EMAIL_APP_PASSWORD),
   });

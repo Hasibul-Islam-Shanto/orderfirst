@@ -124,6 +124,25 @@ describe('Auth validation and session invariants', () => {
     });
   });
 
+  it('embeds user role, name, and email in JWT claims when user object is provided', () => {
+    const cookie = vi.fn();
+    const response = { cookie } as unknown as Response;
+    setSessionCookie(response, {
+      id: resourceId,
+      role: 'ADMIN',
+      name: 'Admin User',
+      email: 'admin@orderfirst.dev',
+    });
+    const token = cookie.mock.calls[0]?.[1];
+    expect(typeof token).toBe('string');
+    const jwt = require('jsonwebtoken');
+    const payload = jwt.decode(token) as Record<string, unknown>;
+    expect(payload.sub).toBe(resourceId);
+    expect(payload.role).toBe('ADMIN');
+    expect(payload.name).toBe('Admin User');
+    expect(payload.email).toBe('admin@orderfirst.dev');
+  });
+
   it('does not log sensitive multiline error messages as stack traces', async () => {
     const { errorContext } = await import('../src/config/logger.js');
     const error = new Error(

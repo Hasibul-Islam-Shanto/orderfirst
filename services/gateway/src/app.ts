@@ -85,7 +85,16 @@ export function createApp() {
   app.get('/health/ready', getAggregatedHealthReady);
 
   // Edge aggregation: Dashboard endpoint
-  app.get('/api/admin/dashboard', requireAdmin, getAggregatedDashboard);
+  app.get(
+    [
+      '/api/admin/dashboard',
+      '/api/admin/dashboard/summary',
+      '/admin/dashboard',
+      '/admin/dashboard/summary',
+    ],
+    requireAdmin,
+    getAggregatedDashboard,
+  );
 
   // Body parser for JSON payloads up to 32kb
   app.use(express.json({ limit: '32kb' }));

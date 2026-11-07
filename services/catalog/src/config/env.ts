@@ -37,7 +37,7 @@ const envSchema = z
 export function parseEnvironment(source: NodeJS.ProcessEnv) {
   const result = envSchema.safeParse({
     ...source,
-    DATABASE_URL: source.DATABASE_URL_CATALOG || source.DATABASE_URL,
+    DATABASE_URL: source.DATABASE_URL || source.DATABASE_URL_CATALOG,
   });
   if (!result.success)
     throw new Error(

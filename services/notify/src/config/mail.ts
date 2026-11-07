@@ -18,15 +18,22 @@ export let lastTestNotification:
 const transporter =
   env.EMAIL_USER && env.EMAIL_APP_PASSWORD
     ? nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        service: 'gmail',
         auth: {
           user: env.EMAIL_USER,
           pass: env.EMAIL_APP_PASSWORD,
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
       })
     : null;
+
+if (transporter) {
+  logger.info({ user: env.EMAIL_USER }, 'Gmail SMTP transporter configured');
+} else {
+  logger.warn('Email delivery in mock mode: EMAIL_USER or EMAIL_APP_PASSWORD is not set');
+}
 
 export async function sendNotificationEmail(input: {
   to: string;
@@ -48,14 +55,17 @@ export async function sendNotificationEmail(input: {
 
   try {
     const info = await transporter.sendMail({
-      from: env.EMAIL_USER,
+      from: `"OrderFirst" <${env.EMAIL_USER}>`,
       to: input.to,
       subject: 'Verify your OrderFirst account',
       text,
       html,
     });
-    logger.info({ messageId: info.messageId }, 'Notification email sent');
+    logger.info({ messageId: info.messageId, to: input.to }, 'Notification email sent');
   } catch (error) {
+    logger.warn(
+      `[FALLBACK VERIFICATION CODE] Delivery to ${input.to} failed. Use OTP code: ${input.code}`,
+    );
     logger.error(
       { error: errorContext(error) },
       'Notification email delivery failed',

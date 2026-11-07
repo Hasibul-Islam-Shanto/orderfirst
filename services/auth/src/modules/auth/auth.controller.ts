@@ -17,7 +17,7 @@ export async function registerUser(
   input: z.output<typeof registerRequest>,
 ) {
   const user = await service.registerUser(input.body);
-  setSessionCookie(response, user.id);
+  setSessionCookie(response, user);
   return sendSuccess(
     response,
     user,
@@ -32,7 +32,7 @@ export async function loginUser(
   input: z.output<typeof loginRequest>,
 ) {
   const user = await service.loginUser(input.body);
-  setSessionCookie(response, user.id);
+  setSessionCookie(response, user);
   return sendSuccess(response, user, 'Logged in successfully');
 }
 
@@ -58,6 +58,7 @@ export async function verifyEmail(
     requireUser(request).id,
     input.body.code,
   );
+  setSessionCookie(response, user);
   return sendSuccess(response, user, 'Email verified successfully');
 }
 
