@@ -30,6 +30,7 @@ out/
 .stylelintcache
 
 # Environment variables & Credentials
+changes.env
 .env
 .env.*
 .env.local
