@@ -113,3 +113,4 @@ flowchart TD
   - `docker-registry-credentials` (Username/Password or Token for Docker Hub / AWS ECR / Private Registry).
   - Optional `deploy-ssh-key` if Jenkins deploys to a remote server rather than the local host.
 - **Agent Environment**: Docker CLI and Node.js 22 installed on the Jenkins agent.
+
