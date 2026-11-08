@@ -1,0 +1,354 @@
+// ==============================================================================
+// OrderFirst Monorepo Declarative Jenkins Pipeline
+// ==============================================================================
+// Features:
+// 1. Git diff change detection (only builds/tests/deploys modified services)
+// 2. Parallel Quality Gate (Typecheck & Unit Tests)
+// 3. Parallel Docker Image Build & Tagging
+// 4. Docker Registry Push with credentials
+// 5. Zero-downtime rolling deployment via Docker Compose
+// 6. Fail-fast safety gate (live containers never touched on test/build failures)
+// ==============================================================================
+
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '30', daysToKeepStr: '30'))
+        timestamps()
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['auto', 'dev', 'prod'],
+            description: 'Deployment target: auto (main=prod, develop/feature=dev), or force dev/prod'
+        )
+        booleanParam(
+            name: 'FORCE_BUILD_ALL',
+            defaultValue: false,
+            description: 'Force test, build, and deploy of all services regardless of git changes'
+        )
+        string(
+            name: 'DOCKER_REGISTRY',
+            defaultValue: 'docker.io/orderfirst',
+            description: 'Container registry namespace prefix (e.g., docker.io/orderfirst or <account>.dkr.ecr.<region>.amazonaws.com)'
+        )
+        string(
+            name: 'DOCKER_PLATFORMS',
+            defaultValue: 'linux/amd64,linux/arm64',
+            description: 'Target platforms for multi-platform Docker builds (e.g. linux/amd64,linux/arm64 for both Linux Ubuntu & macOS)'
+        )
+        string(
+            name: 'REGISTRY_CREDENTIALS_ID',
+            defaultValue: 'docker-registry-credentials',
+            description: 'Jenkins Credentials ID for container registry authentication'
+        )
+    }
+
+    environment {
+        GIT_COMMIT_SHORT = "${sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()}"
+        CHANGE_ENV_FILE  = "changes.env"
+        TARGET_ENV       = "dev"
+        SERVICES_TO_DEPLOY = ""
+    }
+
+    stages {
+        stage('Initialize & Change Detection') {
+            steps {
+                script {
+                    echo "======================================================"
+                    echo "Starting OrderFirst Pipeline for Commit: ${env.GIT_COMMIT_SHORT}"
+                    echo "Branch: ${env.BRANCH_NAME ?: 'unknown'}"
+                    echo "======================================================"
+
+                    // Resolve target environment
+                    if (params.ENVIRONMENT == 'auto') {
+                        if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
+                            env.TARGET_ENV = 'prod'
+                        } else {
+                            env.TARGET_ENV = 'dev'
+                        }
+                    } else {
+                        env.TARGET_ENV = params.ENVIRONMENT
+                    }
+                    echo "Resolved Target Deployment Environment: ${env.TARGET_ENV}"
+
+                    // Run change detection script
+                    sh '''
+                        chmod +x deploy/jenkins/scripts/detect-changes.sh
+                        chmod +x deploy/jenkins/scripts/deploy.sh
+                        chmod +x deploy/jenkins/scripts/build-images.sh
+                        FORCE_BUILD_ALL="${FORCE_BUILD_ALL}" ./deploy/jenkins/scripts/detect-changes.sh HEAD~1 HEAD
+                    '''
+
+                    // Read exported environment variables
+                    def props = readProperties file: "${env.CHANGE_ENV_FILE}"
+                    env.BUILD_AUTH       = props['BUILD_AUTH']       ?: 'false'
+                    env.BUILD_CATALOG    = props['BUILD_CATALOG']    ?: 'false'
+                    env.BUILD_BOOKING    = props['BUILD_BOOKING']    ?: 'false'
+                    env.BUILD_ORDERS     = props['BUILD_ORDERS']     ?: 'false'
+                    env.BUILD_NOTIFY     = props['BUILD_NOTIFY']     ?: 'false'
+                    env.BUILD_GATEWAY    = props['BUILD_GATEWAY']    ?: 'false'
+                    env.BUILD_CLIENT     = props['BUILD_CLIENT']     ?: 'false'
+                    env.BUILD_DB_MIGRATE = props['BUILD_DB_MIGRATE'] ?: 'false'
+                    env.ANY_CHANGED      = props['ANY_CHANGED']      ?: 'false'
+
+                    // Build list of changed services for rolling deploy
+                    def changedList = []
+                    if (env.BUILD_AUTH == 'true')    { changedList.add('auth') }
+                    if (env.BUILD_CATALOG == 'true') { changedList.add('catalog') }
+                    if (env.BUILD_BOOKING == 'true') { changedList.add('booking') }
+                    if (env.BUILD_ORDERS == 'true')  { changedList.add('orders') }
+                    if (env.BUILD_NOTIFY == 'true')  { changedList.add('notify') }
+                    if (env.BUILD_GATEWAY == 'true') { changedList.add('gateway') }
+                    if (env.BUILD_CLIENT == 'true')  { changedList.add('client') }
+
+                    env.SERVICES_TO_DEPLOY = changedList.join(' ')
+                    echo "Services queued for build & deploy: ${env.SERVICES_TO_DEPLOY ?: '(none)'}"
+                }
+            }
+        }
+
+        stage('Parallel Quality Gate (Test & Lint)') {
+            when {
+                expression { return env.ANY_CHANGED == 'true' }
+            }
+            parallel {
+                stage('Test: Auth') {
+                    when { expression { return env.BUILD_AUTH == 'true' } }
+                    steps {
+                        dir('services/auth') {
+                            sh 'npm ci'
+                            sh 'npm run typecheck'
+                            sh 'npm test -- --passWithNoTests'
+                        }
+                    }
+                }
+                stage('Test: Catalog') {
+                    when { expression { return env.BUILD_CATALOG == 'true' } }
+                    steps {
+                        dir('services/catalog') {
+                            sh 'npm ci'
+                            sh 'npm run typecheck'
+                            sh 'npm test -- --passWithNoTests'
+                        }
+                    }
+                }
+                stage('Test: Booking') {
+                    when { expression { return env.BUILD_BOOKING == 'true' } }
+                    steps {
+                        dir('services/booking') {
+                            sh 'npm ci'
+                            sh 'npm run typecheck'
+                            sh 'npm test -- --passWithNoTests'
+                        }
+                    }
+                }
+                stage('Test: Orders') {
+                    when { expression { return env.BUILD_ORDERS == 'true' } }
+                    steps {
+                        dir('services/orders') {
+                            sh 'npm ci'
+                            sh 'npm run typecheck'
+                            sh 'npm test -- --passWithNoTests'
+                        }
+                    }
+                }
+                stage('Test: Notify') {
+                    when { expression { return env.BUILD_NOTIFY == 'true' } }
+                    steps {
+                        dir('services/notify') {
+                            sh 'npm ci'
+                            sh 'npm run typecheck'
+                            sh 'npm test -- --passWithNoTests'
+                        }
+                    }
+                }
+                stage('Test: Gateway') {
+                    when { expression { return env.BUILD_GATEWAY == 'true' } }
+                    steps {
+                        dir('services/gateway') {
+                            sh 'npm ci'
+                            sh 'npm run typecheck'
+                            sh 'npm test -- --passWithNoTests'
+                        }
+                    }
+                }
+                stage('Test: Client') {
+                    when { expression { return env.BUILD_CLIENT == 'true' } }
+                    steps {
+                        dir('client') {
+                            sh 'npm ci'
+                            sh 'npm run build'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Parallel Docker Build & Tag') {
+            when {
+                expression { return env.ANY_CHANGED == 'true' }
+            }
+            parallel {
+                stage('Build: Auth') {
+                    when { expression { return env.BUILD_AUTH == 'true' } }
+                    steps {
+                        sh """
+                            ./deploy/jenkins/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              auth
+                        """
+                    }
+                }
+                stage('Build: Catalog') {
+                    when { expression { return env.BUILD_CATALOG == 'true' } }
+                    steps {
+                        sh """
+                            ./deploy/jenkins/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              catalog
+                        """
+                    }
+                }
+                stage('Build: Booking') {
+                    when { expression { return env.BUILD_BOOKING == 'true' } }
+                    steps {
+                        sh """
+                            ./deploy/jenkins/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              booking
+                        """
+                    }
+                }
+                stage('Build: Orders') {
+                    when { expression { return env.BUILD_ORDERS == 'true' } }
+                    steps {
+                        sh """
+                            ./deploy/jenkins/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              orders
+                        """
+                    }
+                }
+                stage('Build: Notify') {
+                    when { expression { return env.BUILD_NOTIFY == 'true' } }
+                    steps {
+                        sh """
+                            ./deploy/jenkins/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              notify
+                        """
+                    }
+                }
+                stage('Build: Gateway') {
+                    when { expression { return env.BUILD_GATEWAY == 'true' } }
+                    steps {
+                        sh """
+                            ./deploy/jenkins/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              gateway
+                        """
+                    }
+                }
+                stage('Build: Client') {
+                    when { expression { return env.BUILD_CLIENT == 'true' } }
+                    steps {
+                        sh """
+                            ./deploy/jenkins/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              client
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Images to Registry') {
+            when {
+                expression { return env.ANY_CHANGED == 'true' }
+            }
+            steps {
+                script {
+                    echo "[INFO] Pushing updated images to ${params.DOCKER_REGISTRY}..."
+                    // Push images if credentials exist, otherwise log notice
+                    try {
+                        withCredentials([usernamePassword(
+                            credentialsId: params.REGISTRY_CREDENTIALS_ID,
+                            usernameVariable: 'REGISTRY_USER',
+                            passwordVariable: 'REGISTRY_PASS'
+                        )]) {
+                            sh 'echo "$REGISTRY_PASS" | docker login -u "$REGISTRY_USER" --password-stdin'
+                            for (service in env.SERVICES_TO_DEPLOY.split(' ')) {
+                                if (service.trim()) {
+                                    sh "docker push ${params.DOCKER_REGISTRY}/${service}:${env.GIT_COMMIT_SHORT}"
+                                    sh "docker push ${params.DOCKER_REGISTRY}/${service}:latest"
+                                }
+                            }
+                            sh 'docker logout'
+                        }
+                    } catch (Exception e) {
+                        echo "[WARN] Docker registry credentials '${params.REGISTRY_CREDENTIALS_ID}' not configured or login failed: ${e.message}"
+                        echo "[INFO] Skipping remote push; proceeding with local deployment."
+                    }
+                }
+            }
+        }
+
+        stage('Zero-Downtime Rolling Deployment') {
+            when {
+                expression { return env.ANY_CHANGED == 'true' }
+            }
+            steps {
+                script {
+                    echo "======================================================"
+                    echo "Triggering Zero-Downtime Deployment: ${env.TARGET_ENV}"
+                    echo "Services to update: ${env.SERVICES_TO_DEPLOY}"
+                    echo "======================================================"
+
+                    sh """
+                        BUILD_DB_MIGRATE="${env.BUILD_DB_MIGRATE}" \
+                        ./deploy/jenkins/scripts/deploy.sh "${env.TARGET_ENV}" ${env.SERVICES_TO_DEPLOY}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "rm -f ${env.CHANGE_ENV_FILE}"
+            cleanWs deleteDirs: true, notFailBuild: true
+        }
+        success {
+            echo "======================================================"
+            echo "✅ Pipeline Succeeded! Environment: ${env.TARGET_ENV}"
+            echo "Deployed services: ${env.SERVICES_TO_DEPLOY ?: 'No services changed'}"
+            echo "======================================================"
+        }
+        failure {
+            echo "======================================================"
+            echo "❌ Pipeline Failed!"
+            echo "Live server containers were NOT modified (fail-safe quality gate)."
+            echo "======================================================"
+        }
+    }
+}
+

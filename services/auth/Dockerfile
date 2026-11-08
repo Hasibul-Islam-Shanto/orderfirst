@@ -2,6 +2,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache python3 make g++ openssl
+
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
