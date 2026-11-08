@@ -29,7 +29,7 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ALL_SERVICES=("auth" "catalog" "booking" "orders" "notify" "gateway" "client")
 
 PLATFORM="linux/amd64,linux/arm64"
@@ -165,3 +165,4 @@ done
 echo "======================================================"
 echo "🎉 All selected images built successfully for ${PLATFORM}!"
 echo "======================================================"
+

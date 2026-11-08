@@ -176,20 +176,20 @@ OrderFirst is fully configured to support multi-architecture builds. You can dev
 
 ### 1. Build Multi-Platform Images via CLI
 
-Use the dedicated build script [`deploy/scripts/build-images.sh`](file:///Users/hi-shanto/Documents/orderfirst/deploy/scripts/build-images.sh):
+Use the dedicated build script [`deploy/jenkins/scripts/build-images.sh`](file:///Users/hi-shanto/Documents/orderfirst/deploy/jenkins/scripts/build-images.sh):
 
 ```bash
 # Build multi-arch images (both macOS and Linux Ubuntu) and push to registry:
-./deploy/scripts/build-images.sh --platform linux/amd64,linux/arm64 --push
+./deploy/jenkins/scripts/build-images.sh --platform linux/amd64,linux/arm64 --push
 
 # Build specifically for Ubuntu Linux deployment:
-./deploy/scripts/build-images.sh --platform linux/amd64
+./deploy/jenkins/scripts/build-images.sh --platform linux/amd64
 
 # Build natively for local macOS testing (fast, no emulation):
-./deploy/scripts/build-images.sh --platform local
+./deploy/jenkins/scripts/build-images.sh --platform local
 
 # Build a single service (e.g. auth):
-./deploy/scripts/build-images.sh --platform linux/amd64 auth
+./deploy/jenkins/scripts/build-images.sh --platform linux/amd64 auth
 ```
 
 ### 2. Multi-Platform in Jenkins
