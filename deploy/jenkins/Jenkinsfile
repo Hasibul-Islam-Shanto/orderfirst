@@ -64,9 +64,10 @@ pipeline {
                     echo "Branch: ${env.BRANCH_NAME ?: 'unknown'}"
                     echo "======================================================"
 
-                    // Resolve target environment
+                    // Resolve target environment (supports both multibranch and freestyle/pipeline branch vars)
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'dev'
                     if (params.ENVIRONMENT == 'auto') {
-                        if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
+                        if (currentBranch.contains('main') || currentBranch.contains('master')) {
                             env.TARGET_ENV = 'prod'
                         } else {
                             env.TARGET_ENV = 'dev'
@@ -76,6 +77,11 @@ pipeline {
                     }
                     echo "Resolved Target Deployment Environment: ${env.TARGET_ENV}"
 
+                    // Ensure GIT_COMMIT_SHORT is populated
+                    if (!env.GIT_COMMIT_SHORT || env.GIT_COMMIT_SHORT == 'null') {
+                        env.GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD 2>/dev/null || echo "latest"', returnStdout: true).trim()
+                    }
+
                     // Run change detection script
                     sh '''
                         chmod +x deploy/jenkins/scripts/detect-changes.sh
@@ -84,8 +90,19 @@ pipeline {
                         FORCE_BUILD_ALL="${FORCE_BUILD_ALL}" ./deploy/jenkins/scripts/detect-changes.sh HEAD~1 HEAD
                     '''
 
-                    // Read exported environment variables
-                    def props = readProperties file: "${env.CHANGE_ENV_FILE}"
+                    // Parse exported environment variables natively without requiring pipeline-utility-steps plugin
+                    def props = [:]
+                    if (fileExists(env.CHANGE_ENV_FILE)) {
+                        def rawContent = readFile(file: env.CHANGE_ENV_FILE)
+                        def lines = rawContent.split('\\r?\\n')
+                        for (int i = 0; i < lines.length; i++) {
+                            def line = lines[i].trim()
+                            if (line && !line.startsWith('#') && line.contains('=')) {
+                                def parts = line.split('=', 2)
+                                props[parts[0].trim()] = parts[1].trim()
+                            }
+                        }
+                    }
                     env.BUILD_AUTH       = props['BUILD_AUTH']       ?: 'false'
                     env.BUILD_CATALOG    = props['BUILD_CATALOG']    ?: 'false'
                     env.BUILD_BOOKING    = props['BUILD_BOOKING']    ?: 'false'
@@ -334,8 +351,14 @@ pipeline {
 
     post {
         always {
-            sh "rm -f ${env.CHANGE_ENV_FILE}"
-            cleanWs deleteDirs: true, notFailBuild: true
+            sh "rm -f ${env.CHANGE_ENV_FILE} || true"
+            script {
+                try {
+                    cleanWs deleteDirs: true, notFailBuild: true
+                } catch (Exception ignored) {
+                    // ws-cleanup plugin not installed; ignore
+                }
+            }
         }
         success {
             echo "======================================================"
