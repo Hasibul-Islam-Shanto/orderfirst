@@ -167,3 +167,33 @@ OrderFirst includes a centralized, monorepo-aware CI/CD pipeline located in [`de
    - **ID**: `docker-registry-credentials`
    - **Type**: Username with password (or secret token) for your container registry.
 6. Run the build or push a commit. The pipeline automatically detects changed services, tests them in parallel, builds images, and triggers safe rolling updates.
+
+---
+
+## Multi-Platform Docker Builds (macOS & Linux / Ubuntu)
+
+OrderFirst is fully configured to support multi-architecture builds. You can develop and test natively on **macOS (Apple Silicon ARM64 / Intel)** and build images that deploy seamlessly onto **Linux (Ubuntu x86_64 / ARM64)** without `exec format error`.
+
+### 1. Build Multi-Platform Images via CLI
+
+Use the dedicated build script [`deploy/scripts/build-images.sh`](file:///Users/hi-shanto/Documents/orderfirst/deploy/scripts/build-images.sh):
+
+```bash
+# Build multi-arch images (both macOS and Linux Ubuntu) and push to registry:
+./deploy/scripts/build-images.sh --platform linux/amd64,linux/arm64 --push
+
+# Build specifically for Ubuntu Linux deployment:
+./deploy/scripts/build-images.sh --platform linux/amd64
+
+# Build natively for local macOS testing (fast, no emulation):
+./deploy/scripts/build-images.sh --platform local
+
+# Build a single service (e.g. auth):
+./deploy/scripts/build-images.sh --platform linux/amd64 auth
+```
+
+### 2. Multi-Platform in Jenkins
+
+The Jenkins pipeline ([`deploy/jenkins/Jenkinsfile`](file:///Users/hi-shanto/Documents/orderfirst/deploy/jenkins/Jenkinsfile)) includes a configurable parameter `DOCKER_PLATFORMS`:
+- **Default value**: `linux/amd64,linux/arm64`
+- Builds and packages dual-architecture container manifests automatically so the same image tag works natively across both local Mac developer environments and remote Ubuntu cloud instances.

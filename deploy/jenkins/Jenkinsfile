@@ -37,6 +37,11 @@ pipeline {
             description: 'Container registry namespace prefix (e.g., docker.io/orderfirst or <account>.dkr.ecr.<region>.amazonaws.com)'
         )
         string(
+            name: 'DOCKER_PLATFORMS',
+            defaultValue: 'linux/amd64,linux/arm64',
+            description: 'Target platforms for multi-platform Docker builds (e.g. linux/amd64,linux/arm64 for both Linux Ubuntu & macOS)'
+        )
+        string(
             name: 'REGISTRY_CREDENTIALS_ID',
             defaultValue: 'docker-registry-credentials',
             description: 'Jenkins Credentials ID for container registry authentication'
@@ -75,6 +80,7 @@ pipeline {
                     sh '''
                         chmod +x deploy/jenkins/scripts/detect-changes.sh
                         chmod +x deploy/jenkins/scripts/deploy.sh
+                        chmod +x deploy/scripts/build-images.sh
                         FORCE_BUILD_ALL="${FORCE_BUILD_ALL}" ./deploy/jenkins/scripts/detect-changes.sh HEAD~1 HEAD
                     '''
 
@@ -192,10 +198,11 @@ pipeline {
                     when { expression { return env.BUILD_AUTH == 'true' } }
                     steps {
                         sh """
-                            docker build \
-                              -t ${params.DOCKER_REGISTRY}/auth:${env.GIT_COMMIT_SHORT} \
-                              -t ${params.DOCKER_REGISTRY}/auth:latest \
-                              -f services/auth/Dockerfile services/auth
+                            ./deploy/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              auth
                         """
                     }
                 }
@@ -203,10 +210,11 @@ pipeline {
                     when { expression { return env.BUILD_CATALOG == 'true' } }
                     steps {
                         sh """
-                            docker build \
-                              -t ${params.DOCKER_REGISTRY}/catalog:${env.GIT_COMMIT_SHORT} \
-                              -t ${params.DOCKER_REGISTRY}/catalog:latest \
-                              -f services/catalog/Dockerfile services/catalog
+                            ./deploy/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              catalog
                         """
                     }
                 }
@@ -214,10 +222,11 @@ pipeline {
                     when { expression { return env.BUILD_BOOKING == 'true' } }
                     steps {
                         sh """
-                            docker build \
-                              -t ${params.DOCKER_REGISTRY}/booking:${env.GIT_COMMIT_SHORT} \
-                              -t ${params.DOCKER_REGISTRY}/booking:latest \
-                              -f services/booking/Dockerfile services/booking
+                            ./deploy/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              booking
                         """
                     }
                 }
@@ -225,10 +234,11 @@ pipeline {
                     when { expression { return env.BUILD_ORDERS == 'true' } }
                     steps {
                         sh """
-                            docker build \
-                              -t ${params.DOCKER_REGISTRY}/orders:${env.GIT_COMMIT_SHORT} \
-                              -t ${params.DOCKER_REGISTRY}/orders:latest \
-                              -f services/orders/Dockerfile services/orders
+                            ./deploy/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              orders
                         """
                     }
                 }
@@ -236,10 +246,11 @@ pipeline {
                     when { expression { return env.BUILD_NOTIFY == 'true' } }
                     steps {
                         sh """
-                            docker build \
-                              -t ${params.DOCKER_REGISTRY}/notify:${env.GIT_COMMIT_SHORT} \
-                              -t ${params.DOCKER_REGISTRY}/notify:latest \
-                              -f services/notify/Dockerfile services/notify
+                            ./deploy/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              notify
                         """
                     }
                 }
@@ -247,10 +258,11 @@ pipeline {
                     when { expression { return env.BUILD_GATEWAY == 'true' } }
                     steps {
                         sh """
-                            docker build \
-                              -t ${params.DOCKER_REGISTRY}/gateway:${env.GIT_COMMIT_SHORT} \
-                              -t ${params.DOCKER_REGISTRY}/gateway:latest \
-                              -f services/gateway/Dockerfile services/gateway
+                            ./deploy/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              gateway
                         """
                     }
                 }
@@ -258,10 +270,11 @@ pipeline {
                     when { expression { return env.BUILD_CLIENT == 'true' } }
                     steps {
                         sh """
-                            docker build \
-                              -t ${params.DOCKER_REGISTRY}/client:${env.GIT_COMMIT_SHORT} \
-                              -t ${params.DOCKER_REGISTRY}/client:latest \
-                              -f client/Dockerfile client
+                            ./deploy/scripts/build-images.sh \
+                              --platform "${params.DOCKER_PLATFORMS}" \
+                              --registry "${params.DOCKER_REGISTRY}" \
+                              --tag "${env.GIT_COMMIT_SHORT}" \
+                              client
                         """
                     }
                 }
@@ -338,3 +351,4 @@ pipeline {
         }
     }
 }
+
