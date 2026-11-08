@@ -1,0 +1,336 @@
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+networks:
+  public:
+    driver: bridge
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data_dev:
+  rabbitmq_data_dev:
+
+services:
+  postgres:
+    <<: *default-logging
+    image: postgres:16-alpine
+    container_name: orderfirst-postgres-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-orderfirst_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password_123}
+      AUTH_DB_USER: ${AUTH_DB_USER:-auth_dev_user}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth_dev_password_123}
+      CATALOG_DB_USER: ${CATALOG_DB_USER:-catalog_dev_user}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog_dev_password_123}
+      ORDERS_DB_USER: ${ORDERS_DB_USER:-orders_dev_user}
+      ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders_dev_password_123}
+      BOOKING_DB_USER: ${BOOKING_DB_USER:-booking_dev_user}
+      BOOKING_DB_PASSWORD: ${BOOKING_DB_PASSWORD:-booking_dev_password_123}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ../../infra/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-orderfirst_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    <<: *default-logging
+    image: rabbitmq:3-management-alpine
+    container_name: orderfirst-rabbitmq-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-dev_guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-dev_guest_pass}
+    ports:
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data_dev:/var/lib/rabbitmq
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  db-migrate:
+    <<: *default-logging
+    image: node:22-alpine
+    container_name: orderfirst-db-migrate-dev
+    restart: "no"
+    env_file:
+      - ../../.env.dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-orderfirst_dev}
+      AUTH_DB_USER: ${AUTH_DB_USER:-auth_dev_user}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth_dev_password_123}
+      CATALOG_DB_USER: ${CATALOG_DB_USER:-catalog_dev_user}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog_dev_password_123}
+      BOOKING_DB_USER: ${BOOKING_DB_USER:-booking_dev_user}
+      BOOKING_DB_PASSWORD: ${BOOKING_DB_PASSWORD:-booking_dev_password_123}
+      ORDERS_DB_USER: ${ORDERS_DB_USER:-orders_dev_user}
+      ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders_dev_password_123}
+    volumes:
+      - ../../services:/services:ro
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache openssl
+        echo "Deploying database migrations in dev..."
+        DATABASE_URL="postgresql://$${AUTH_DB_USER}:$${AUTH_DB_PASSWORD}@postgres:5432/$${POSTGRES_DB}?schema=auth" npx --yes prisma@6.19.0 migrate deploy --schema=/services/auth/prisma/schema.prisma
+        DATABASE_URL="postgresql://$${CATALOG_DB_USER}:$${CATALOG_DB_PASSWORD}@postgres:5432/$${POSTGRES_DB}?schema=catalog" npx --yes prisma@6.19.0 migrate deploy --schema=/services/catalog/prisma/schema.prisma
+        DATABASE_URL="postgresql://$${BOOKING_DB_USER}:$${BOOKING_DB_PASSWORD}@postgres:5432/$${POSTGRES_DB}?schema=booking" npx --yes prisma@6.19.0 migrate deploy --schema=/services/booking/prisma/schema.prisma
+        DATABASE_URL="postgresql://$${ORDERS_DB_USER}:$${ORDERS_DB_PASSWORD}@postgres:5432/$${POSTGRES_DB}?schema=orders" npx --yes prisma@6.19.0 migrate deploy --schema=/services/orders/prisma/schema.prisma
+        echo "All dev migrations applied successfully!"
+
+  auth:
+    <<: *default-logging
+    build:
+      context: ../../services/auth
+      dockerfile: Dockerfile
+    container_name: orderfirst-auth-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      PORT: 4001
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${AUTH_DB_USER:-auth_dev_user}:${AUTH_DB_PASSWORD:-auth_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=auth
+      DATABASE_URL_AUTH: postgresql://${AUTH_DB_USER:-auth_dev_user}:${AUTH_DB_PASSWORD:-auth_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=auth
+      JWT_SECRET: ${JWT_SECRET:-dev-environment-jwt-secret-min-32-characters-long}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-internal-secret-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-dev_guest}:${RABBITMQ_DEFAULT_PASS:-dev_guest_pass}@rabbitmq:5672
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4001/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  catalog:
+    <<: *default-logging
+    build:
+      context: ../../services/catalog
+      dockerfile: Dockerfile
+    container_name: orderfirst-catalog-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      PORT: 4002
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${CATALOG_DB_USER:-catalog_dev_user}:${CATALOG_DB_PASSWORD:-catalog_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=catalog
+      DATABASE_URL_CATALOG: postgresql://${CATALOG_DB_USER:-catalog_dev_user}:${CATALOG_DB_PASSWORD:-catalog_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=catalog
+      JWT_SECRET: ${JWT_SECRET:-dev-environment-jwt-secret-min-32-characters-long}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-internal-secret-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4002/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  booking:
+    <<: *default-logging
+    build:
+      context: ../../services/booking
+      dockerfile: Dockerfile
+    container_name: orderfirst-booking-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      PORT: 4003
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${BOOKING_DB_USER:-booking_dev_user}:${BOOKING_DB_PASSWORD:-booking_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=booking
+      DATABASE_URL_BOOKING: postgresql://${BOOKING_DB_USER:-booking_dev_user}:${BOOKING_DB_PASSWORD:-booking_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=booking
+      JWT_SECRET: ${JWT_SECRET:-dev-environment-jwt-secret-min-32-characters-long}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-internal-secret-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-dev_guest}:${RABBITMQ_DEFAULT_PASS:-dev_guest_pass}@rabbitmq:5672
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4003/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  orders:
+    <<: *default-logging
+    build:
+      context: ../../services/orders
+      dockerfile: Dockerfile
+    container_name: orderfirst-orders-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      PORT: 4004
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${ORDERS_DB_USER:-orders_dev_user}:${ORDERS_DB_PASSWORD:-orders_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=orders
+      DATABASE_URL_ORDERS: postgresql://${ORDERS_DB_USER:-orders_dev_user}:${ORDERS_DB_PASSWORD:-orders_dev_password_123}@postgres:5432/${POSTGRES_DB:-orderfirst_dev}?schema=orders
+      CATALOG_SERVICE_URL: http://catalog:4002
+      JWT_SECRET: ${JWT_SECRET:-dev-environment-jwt-secret-min-32-characters-long}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-internal-secret-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-dev_guest}:${RABBITMQ_DEFAULT_PASS:-dev_guest_pass}@rabbitmq:5672
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      catalog:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4004/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notify:
+    <<: *default-logging
+    build:
+      context: ../../services/notify
+      dockerfile: Dockerfile
+    container_name: orderfirst-notify-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      PORT: 4005
+      NODE_ENV: ${NODE_ENV:-development}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-dev_guest}:${RABBITMQ_DEFAULT_PASS:-dev_guest_pass}@rabbitmq:5672
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_APP_PASSWORD: ${EMAIL_APP_PASSWORD:-}
+    networks:
+      - internal
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4005/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    <<: *default-logging
+    build:
+      context: ../../services/gateway
+      dockerfile: Dockerfile
+    container_name: orderfirst-gateway-dev
+    restart: unless-stopped
+    env_file:
+      - ../../.env.dev
+    environment:
+      PORT: 4000
+      NODE_ENV: ${NODE_ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-dev-environment-jwt-secret-min-32-characters-long}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-internal-secret-min-16-chars}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      AUTH_SERVICE_URL: http://auth:4001
+      CATALOG_SERVICE_URL: http://catalog:4002
+      BOOKING_SERVICE_URL: http://booking:4003
+      ORDERS_SERVICE_URL: http://orders:4004
+      NOTIFY_SERVICE_URL: http://notify:4005
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-dev_guest}:${RABBITMQ_DEFAULT_PASS:-dev_guest_pass}@rabbitmq:5672
+    ports:
+      - "${GATEWAY_PORT:-4000}:4000"
+    networks:
+      - public
+      - internal
+    depends_on:
+      auth:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+      booking:
+        condition: service_healthy
+      orders:
+        condition: service_healthy
+      notify:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  client:
+    <<: *default-logging
+    build:
+      context: ../../client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api}
+    container_name: orderfirst-client-dev
+    restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-80}:80"
+    networks:
+      - public
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
