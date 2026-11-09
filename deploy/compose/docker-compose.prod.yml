@@ -315,13 +315,14 @@ services:
       context: ../../client
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-https://orderfirst.yourdomain.com/api}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: orderfirst-client-prod
     restart: always
     ports:
       - "${CLIENT_PORT:-80}:80"
     networks:
       - public
+      - internal
     depends_on:
       gateway:
         condition: service_healthy

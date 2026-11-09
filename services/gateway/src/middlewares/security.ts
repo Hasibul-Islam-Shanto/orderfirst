@@ -13,8 +13,17 @@ export const protectCookieRequests: RequestHandler = (
 ) => {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
     const origin = request.get('origin');
+    const host = request.get('host');
+    const isSameOrigin =
+      origin &&
+      host &&
+      (origin === `http://${host}` || origin === `https://${host}`);
+
     if (
-      (origin && origin !== env.FRONTEND_URL) ||
+      (origin &&
+        origin !== env.FRONTEND_URL &&
+        !isSameOrigin &&
+        env.NODE_ENV === 'production') ||
       request.get('x-orderfirst-request') !== '1'
     )
       throw new AppError(

@@ -60,11 +60,17 @@ export function createApp() {
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin || origin === env.FRONTEND_URL) callback(null, true);
-        else
+        if (
+          !origin ||
+          origin === env.FRONTEND_URL ||
+          env.NODE_ENV !== 'production'
+        ) {
+          callback(null, true);
+        } else {
           callback(
             new AppError(403, 'Origin is not allowed', 'ORIGIN_NOT_ALLOWED'),
           );
+        }
       },
       credentials: true,
       methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],

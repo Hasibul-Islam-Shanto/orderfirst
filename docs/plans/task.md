@@ -9,3 +9,4 @@
 | 7. Optimize Docker build speed | Done | Defaulted to native `linux/amd64` and pruned `python3 make g++` from auth builder |
 | 8. Fix .env.dev and zero-downtime deploy | Done | Auto-create .env.dev from template, sanitize deploy args, and bootstrap offline infra |
 | 9. Resolve client healthcheck (IPv6/127.0.0.1) | Done | Added IPv6 listen to nginx and switched healthcheck to 127.0.0.1 to prevent connection refused |
+| 10. Implement Solution 1 (Nginx API Reverse Proxy) | Done | Nginx reverse proxies `/api` to gateway, client uses relative `/api`, gateway supports same-origin |
