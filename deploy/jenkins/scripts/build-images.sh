@@ -112,6 +112,22 @@ echo "Push to Registry:   ${PUSH_FLAG}"
 echo "Load to Local:      ${LOAD_FLAG}"
 echo "======================================================"
 
+export DOCKER_BUILDKIT=1
+
+# Verify Docker daemon is reachable by the current user
+if ! docker info >/dev/null 2>&1; then
+  echo "======================================================"
+  echo "❌ [ERROR] Cannot connect to Docker daemon as user '$(whoami)'!"
+  echo "Possible fixes on Ubuntu/EC2:"
+  echo "  1. Add jenkins user to docker group:"
+  echo "     sudo usermod -aG docker $(whoami)"
+  echo "     sudo systemctl restart jenkins"
+  echo "  2. Ensure docker service is running:"
+  echo "     sudo systemctl status docker"
+  echo "======================================================"
+  exit 1
+fi
+
 # Check if docker buildx is installed
 HAS_BUILDX=false
 if docker buildx version >/dev/null 2>&1; then
