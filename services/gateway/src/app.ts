@@ -1,3 +1,7 @@
+/**
+ * OrderFirst API Gateway Application
+ * Edge reverse proxy, security headers, rate limiting, and session extraction.
+ */
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import helmet from 'helmet';

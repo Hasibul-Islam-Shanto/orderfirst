@@ -1,3 +1,10 @@
+# ==============================================================================
+# OrderFirst Monorepo — Development Docker Compose Stack
+# ==============================================================================
+# Orchestrates PostgreSQL 16, RabbitMQ 3, Prisma db-migrate, and all 6 Node/TS
+# microservices + React Client on the internal/public bridge networks.
+# ==============================================================================
+
 x-logging: &default-logging
   logging:
     driver: "json-file"
