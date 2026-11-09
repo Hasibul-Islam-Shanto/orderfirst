@@ -83,12 +83,12 @@ pipeline {
                     }
 
                     // Run change detection script
-                    sh '''
+                    sh """
                         chmod +x deploy/jenkins/scripts/detect-changes.sh
                         chmod +x deploy/jenkins/scripts/deploy.sh
                         chmod +x deploy/jenkins/scripts/build-images.sh
-                        FORCE_BUILD_ALL="${FORCE_BUILD_ALL}" ./deploy/jenkins/scripts/detect-changes.sh HEAD~1 HEAD
-                    '''
+                        FORCE_BUILD_ALL="${params.FORCE_BUILD_ALL}" ./deploy/jenkins/scripts/detect-changes.sh HEAD~1 HEAD
+                    """
 
                     // Parse exported environment variables natively without requiring pipeline-utility-steps plugin
                     def props = [:]

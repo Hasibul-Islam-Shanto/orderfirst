@@ -62,8 +62,8 @@ else
   echo "------------------------------------------------------"
 
   # Check for global changes that require all services to rebuild
-  if echo "${CHANGED_FILES}" | grep -qE '^(infra/|deploy/compose/|package\.json$|package-lock\.json$)'; then
-    echo "[INFO] Global infrastructure, root dependencies, or compose files modified. Triggering all services."
+  if echo "${CHANGED_FILES}" | grep -qE '^(infra/|deploy/|package\.json$|package-lock\.json$|\.env)'; then
+    echo "[INFO] Global infrastructure, root dependencies, deploy or compose files modified. Triggering all services."
     BUILD_AUTH=true
     BUILD_CATALOG=true
     BUILD_BOOKING=true
