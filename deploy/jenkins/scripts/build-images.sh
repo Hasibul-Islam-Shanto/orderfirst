@@ -112,16 +112,26 @@ echo "Push to Registry:   ${PUSH_FLAG}"
 echo "Load to Local:      ${LOAD_FLAG}"
 echo "======================================================"
 
-# Ensure buildx builder exists and supports multi-arch
-BUILDER_NAME="orderfirst-multiarch"
-if ! docker buildx ls | grep -q "${BUILDER_NAME}"; then
-  echo "[INFO] Creating Docker buildx builder: ${BUILDER_NAME}..."
-  docker buildx create --name "${BUILDER_NAME}" --driver docker-container --bootstrap --use >/dev/null 2>&1 || true
+# Check if docker buildx is installed
+HAS_BUILDX=false
+if docker buildx version >/dev/null 2>&1; then
+  HAS_BUILDX=true
+  echo "[INFO] Docker Buildx detected. Multi-platform build enabled for [${PLATFORM}]."
+  
+  # Ensure buildx builder exists and supports multi-arch
+  BUILDER_NAME="orderfirst-multiarch"
+  if ! docker buildx ls 2>/dev/null | grep -q "${BUILDER_NAME}"; then
+    echo "[INFO] Creating Docker buildx builder: ${BUILDER_NAME}..."
+    docker buildx create --name "${BUILDER_NAME}" --driver docker-container --bootstrap --use >/dev/null 2>&1 || true
+  else
+    docker buildx use "${BUILDER_NAME}" >/dev/null 2>&1 || true
+  fi
 else
-  docker buildx use "${BUILDER_NAME}" >/dev/null 2>&1 || true
+  echo "[WARN] 'docker buildx' plugin is not installed on this system."
+  echo "[INFO] Falling back to standard 'docker build' for native architecture ($(uname -m))."
 fi
 
-# Build action arguments
+# Build action arguments for buildx
 ACTION_ARGS=()
 if [ "${PUSH_FLAG}" = "true" ]; then
   ACTION_ARGS+=("--push")
@@ -132,7 +142,7 @@ fi
 # Build each service
 for SVC in "${SERVICES[@]}"; do
   echo "------------------------------------------------------"
-  echo "[BUILDING] Service: ${SVC} for [${PLATFORM}]..."
+  echo "[BUILDING] Service: ${SVC}..."
   
   if [ "${SVC}" = "client" ]; then
     CONTEXT_DIR="${PROJECT_ROOT}/client"
@@ -149,15 +159,31 @@ for SVC in "${SERVICES[@]}"; do
     exit 1
   fi
 
-  # shellcheck disable=SC2068
-  docker buildx build \
-    --platform "${PLATFORM}" \
-    -t "${REGISTRY}/${SVC}:${TAG}" \
-    -t "${REGISTRY}/${SVC}:latest" \
-    -f "${DOCKERFILE}" \
-    ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
-    ${ACTION_ARGS[@]+"${ACTION_ARGS[@]}"} \
-    "${CONTEXT_DIR}"
+  if [ "${HAS_BUILDX}" = "true" ]; then
+    # shellcheck disable=SC2068
+    docker buildx build \
+      --platform "${PLATFORM}" \
+      -t "${REGISTRY}/${SVC}:${TAG}" \
+      -t "${REGISTRY}/${SVC}:latest" \
+      -f "${DOCKERFILE}" \
+      ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
+      ${ACTION_ARGS[@]+"${ACTION_ARGS[@]}"} \
+      "${CONTEXT_DIR}"
+  else
+    # Standard docker build fallback (native host architecture)
+    # shellcheck disable=SC2068
+    docker build \
+      -t "${REGISTRY}/${SVC}:${TAG}" \
+      -t "${REGISTRY}/${SVC}:latest" \
+      -f "${DOCKERFILE}" \
+      ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
+      "${CONTEXT_DIR}"
+
+    if [ "${PUSH_FLAG}" = "true" ]; then
+      docker push "${REGISTRY}/${SVC}:${TAG}"
+      docker push "${REGISTRY}/${SVC}:latest"
+    fi
+  fi
 
   echo "✅ [SUCCESS] Built ${SVC} (${REGISTRY}/${SVC}:${TAG})"
 done
