@@ -106,6 +106,7 @@ services:
 
   auth:
     <<: *default-logging
+    image: ${DOCKER_REGISTRY:-orderfirst}/auth:latest
     build:
       context: ../../services/auth
       dockerfile: Dockerfile
@@ -140,6 +141,7 @@ services:
 
   catalog:
     <<: *default-logging
+    image: ${DOCKER_REGISTRY:-orderfirst}/catalog:latest
     build:
       context: ../../services/catalog
       dockerfile: Dockerfile
@@ -170,6 +172,7 @@ services:
 
   booking:
     <<: *default-logging
+    image: ${DOCKER_REGISTRY:-orderfirst}/booking:latest
     build:
       context: ../../services/booking
       dockerfile: Dockerfile
@@ -203,6 +206,7 @@ services:
 
   orders:
     <<: *default-logging
+    image: ${DOCKER_REGISTRY:-orderfirst}/orders:latest
     build:
       context: ../../services/orders
       dockerfile: Dockerfile
@@ -239,6 +243,7 @@ services:
 
   notify:
     <<: *default-logging
+    image: ${DOCKER_REGISTRY:-orderfirst}/notify:latest
     build:
       context: ../../services/notify
       dockerfile: Dockerfile
@@ -265,6 +270,7 @@ services:
 
   gateway:
     <<: *default-logging
+    image: ${DOCKER_REGISTRY:-orderfirst}/gateway:latest
     build:
       context: ../../services/gateway
       dockerfile: Dockerfile
@@ -311,6 +317,7 @@ services:
 
   client:
     <<: *default-logging
+    image: ${DOCKER_REGISTRY:-orderfirst}/client:latest
     build:
       context: ../../client
       dockerfile: Dockerfile

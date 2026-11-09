@@ -98,11 +98,11 @@ fi
 # Step 2: Deploy services (Selective rolling restart or full stack)
 if [ "${INFRA_ONLINE}" = "false" ] || [ -z "${SERVICES_TO_DEPLOY}" ]; then
   echo "[INFO] Base infrastructure newly started or all services flagged. Deploying full stack..."
-  docker compose -f "${COMPOSE_FILE}" ${ENV_ARG} up -d
+  docker compose -f "${COMPOSE_FILE}" ${ENV_ARG} up -d --force-recreate
 else
   echo "[INFO] Performing selective zero-downtime restart for services: ${SERVICES_TO_DEPLOY}"
   # shellcheck disable=SC2086
-  docker compose -f "${COMPOSE_FILE}" ${ENV_ARG} up -d --no-deps ${SERVICES_TO_DEPLOY}
+  docker compose -f "${COMPOSE_FILE}" ${ENV_ARG} up -d --no-deps --force-recreate ${SERVICES_TO_DEPLOY}
 fi
 
 # Step 3: Healthcheck verification

@@ -163,7 +163,7 @@ for SVC in "${SERVICES[@]}"; do
   if [ "${SVC}" = "client" ]; then
     CONTEXT_DIR="${PROJECT_ROOT}/client"
     DOCKERFILE="${PROJECT_ROOT}/client/Dockerfile"
-    BUILD_ARGS=("--build-arg" "VITE_API_URL=${VITE_API_URL:-http://localhost:4000/api}")
+    BUILD_ARGS=("--build-arg" "VITE_API_URL=${VITE_API_URL:-/api}")
   else
     CONTEXT_DIR="${PROJECT_ROOT}/services/${SVC}"
     DOCKERFILE="${PROJECT_ROOT}/services/${SVC}/Dockerfile"

@@ -10,3 +10,4 @@
 | 8. Fix .env.dev and zero-downtime deploy | Done | Auto-create .env.dev from template, sanitize deploy args, and bootstrap offline infra |
 | 9. Resolve client healthcheck (IPv6/127.0.0.1) | Done | Added IPv6 listen to nginx and switched healthcheck to 127.0.0.1 to prevent connection refused |
 | 10. Implement Solution 1 (Nginx API Reverse Proxy) | Done | Nginx reverse proxies `/api` to gateway, client uses relative `/api`, gateway supports same-origin |
+| 11. Connect image tags & force-recreate | Done | Added image tags to compose files, fixed build-images.sh default arg to /api, added --force-recreate |
