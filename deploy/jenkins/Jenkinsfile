@@ -313,8 +313,9 @@ pipeline {
                             passwordVariable: 'REGISTRY_PASS'
                         )]) {
                             sh 'echo "$REGISTRY_PASS" | docker login -u "$REGISTRY_USER" --password-stdin'
-                            for (service in env.SERVICES_TO_DEPLOY.split(' ')) {
-                                if (service.trim()) {
+                            def pushList = (env.SERVICES_TO_DEPLOY && env.SERVICES_TO_DEPLOY != 'null') ? env.SERVICES_TO_DEPLOY.split(' ') : []
+                            for (service in pushList) {
+                                if (service && service.trim() && service != 'null') {
                                     sh "docker push ${params.DOCKER_REGISTRY}/${service}:${env.GIT_COMMIT_SHORT}"
                                     sh "docker push ${params.DOCKER_REGISTRY}/${service}:latest"
                                 }
@@ -335,14 +336,15 @@ pipeline {
             }
             steps {
                 script {
+                    def deployServices = (env.SERVICES_TO_DEPLOY && env.SERVICES_TO_DEPLOY != 'null') ? env.SERVICES_TO_DEPLOY : ''
                     echo "======================================================"
                     echo "Triggering Zero-Downtime Deployment: ${env.TARGET_ENV}"
-                    echo "Services to update: ${env.SERVICES_TO_DEPLOY}"
+                    echo "Services to update: ${deployServices ?: '(all services)'}"
                     echo "======================================================"
 
                     sh """
                         BUILD_DB_MIGRATE="${env.BUILD_DB_MIGRATE}" \
-                        ./deploy/jenkins/scripts/deploy.sh "${env.TARGET_ENV}" ${env.SERVICES_TO_DEPLOY}
+                        ./deploy/jenkins/scripts/deploy.sh "${env.TARGET_ENV}" ${deployServices}
                     """
                 }
             }
@@ -352,13 +354,6 @@ pipeline {
     post {
         always {
             sh "rm -f ${env.CHANGE_ENV_FILE} || true"
-            script {
-                try {
-                    cleanWs deleteDirs: true, notFailBuild: true
-                } catch (Exception ignored) {
-                    // ws-cleanup plugin not installed; ignore
-                }
-            }
         }
         success {
             echo "======================================================"

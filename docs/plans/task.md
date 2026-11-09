@@ -7,4 +7,5 @@
 | 5. Execute cleanup & verification | Done | All 6 services typecheck clean, client builds, 100% unit tests pass |
 | 6. Diagnose Jenkins 18+ min build | Done | Identified QEMU ARM64 CPU emulation on x86_64 EC2 agent and redundant build packages |
 | 7. Optimize Docker build speed | Done | Defaulted to native `linux/amd64` and pruned `python3 make g++` from auth builder |
-| 8. Push commit & verify CI/CD | In Progress | Pushed `319bdf0` to `dev`; ready for user build verification in Jenkins |
+| 8. Fix .env.dev and zero-downtime deploy | Done | Auto-create .env.dev from template, sanitize arguments, start infra if offline |
+| 9. Push commit & verify CI/CD | In Progress | Ready to commit and push changes to dev branch |
