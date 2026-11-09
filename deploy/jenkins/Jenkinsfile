@@ -38,8 +38,8 @@ pipeline {
         )
         string(
             name: 'DOCKER_PLATFORMS',
-            defaultValue: 'linux/amd64,linux/arm64',
-            description: 'Target platforms for multi-platform Docker builds (e.g. linux/amd64,linux/arm64 for both Linux Ubuntu & macOS)'
+            defaultValue: 'linux/amd64',
+            description: 'Target platform for Docker builds (linux/amd64 for native fast Ubuntu deployment; or linux/amd64,linux/arm64 for multi-arch)'
         )
         string(
             name: 'REGISTRY_CREDENTIALS_ID',

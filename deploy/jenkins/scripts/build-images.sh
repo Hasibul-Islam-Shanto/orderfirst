@@ -32,7 +32,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ALL_SERVICES=("auth" "catalog" "booking" "orders" "notify" "gateway" "client")
 
-PLATFORM="linux/amd64,linux/arm64"
+PLATFORM="linux/amd64"
 REGISTRY="${DOCKER_REGISTRY:-orderfirst}"
 PUSH_FLAG=false
 LOAD_FLAG=false
