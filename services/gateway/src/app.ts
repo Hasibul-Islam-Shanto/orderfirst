@@ -9,6 +9,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
+import { metrics } from './config/metrics.js';
 import { AppError } from './errors/app-error.js';
 import {
   protectCookieRequests,
@@ -55,6 +56,8 @@ export function createApp() {
     next();
   });
 
+  app.use(metrics.metricsMiddleware);
+
   app.use(helmet());
 
   app.use(
@@ -88,9 +91,14 @@ export function createApp() {
   app.use(cookieParser());
   app.use(extractSession);
 
-  // Gateway health endpoints
+  // Gateway health & telemetry endpoints
   app.get('/health', (_request, response) => {
     response.json({ status: 'ok', service: 'gateway' });
+  });
+
+  app.get(['/metrics', '/metrices'], async (_request, response) => {
+    response.setHeader('Content-Type', metrics.register.contentType);
+    response.send(await metrics.register.metrics());
   });
 
   app.get('/health/ready', getAggregatedHealthReady);
