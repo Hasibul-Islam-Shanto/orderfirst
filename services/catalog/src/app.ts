@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
 import { logger, errorContext } from './config/logger.js';
+import { metrics } from './config/metrics.js';
 import { AppError } from './errors/app-error.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { menuRouter } from './modules/menu/menu.route.js';
@@ -36,6 +37,8 @@ export function createApp() {
     next();
   });
 
+  app.use(metrics.metricsMiddleware);
+
   app.use(helmet());
 
   app.use(
@@ -64,6 +67,11 @@ export function createApp() {
 
   app.get('/health', (_request, response) => {
     response.json({ status: 'ok', service: 'catalog' });
+  });
+
+  app.get(['/metrics', '/metrices'], async (_request, response) => {
+    response.setHeader('Content-Type', metrics.register.contentType);
+    response.send(await metrics.register.metrics());
   });
 
   app.get('/health/ready', async (_request, response) => {
