@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
 import { logger, errorContext } from './config/logger.js';
 import { requestContext } from './config/context.js';
+import { metrics } from './config/metrics.js';
 import { AppError } from './errors/app-error.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { orderRouter, adminOrderRouter } from './modules/orders/order.route.js';
@@ -39,6 +40,8 @@ export function createApp() {
     requestContext.run({ requestId }, () => next());
   });
 
+  app.use(metrics.metricsMiddleware);
+
   app.use(helmet());
 
   app.use(
@@ -69,6 +72,11 @@ export function createApp() {
 
   app.get('/health', (_request, response) => {
     response.json({ status: 'ok', service: 'orders' });
+  });
+
+  app.get(['/metrics', '/metrices'], async (_request, response) => {
+    response.setHeader('Content-Type', metrics.register.contentType);
+    response.send(await metrics.register.metrics());
   });
 
   app.get('/health/ready', async (_request, response) => {
