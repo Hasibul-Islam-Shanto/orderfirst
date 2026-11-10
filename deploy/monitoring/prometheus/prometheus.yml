@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  - job_name: 'orderfirst-microservices'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['gateway:4000']
+        labels:
+          service: 'gateway'
+      - targets: ['auth:4001']
+        labels:
+          service: 'auth'
+      - targets: ['catalog:4002']
+        labels:
+          service: 'catalog'
+      - targets: ['booking:4003']
+        labels:
+          service: 'booking'
+      - targets: ['orders:4004']
+        labels:
+          service: 'orders'
+      - targets: ['notify:4005']
+        labels:
+          service: 'notify'
