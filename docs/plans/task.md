@@ -1,13 +1,8 @@
 | Task | Status | Notes |
 | :--- | :--- | :--- |
-| 1. Explore project context | Done | Scanned repository for dead code, temporary files, orphan configs |
-| 2. Ask clarifying questions | Done | Confirmed no breaking changes, confirmed empty folders to clean |
-| 3. Propose cleanup approach | Done | Safe removal of orphan .gitkeep, empty dirs, .DS_Store |
-| 4. Present design & audit items | Done | Verified 0 deadcode, 0 TODOs, 0 FIXMEs across monorepo |
-| 5. Execute cleanup & verification | Done | All 6 services typecheck clean, client builds, 100% unit tests pass |
-| 6. Diagnose Jenkins 18+ min build | Done | Identified QEMU ARM64 CPU emulation on x86_64 EC2 agent and redundant build packages |
-| 7. Optimize Docker build speed | Done | Defaulted to native `linux/amd64` and pruned `python3 make g++` from auth builder |
-| 8. Fix .env.dev and zero-downtime deploy | Done | Auto-create .env.dev from template, sanitize deploy args, and bootstrap offline infra |
-| 9. Resolve client healthcheck (IPv6/127.0.0.1) | Done | Added IPv6 listen to nginx and switched healthcheck to 127.0.0.1 to prevent connection refused |
-| 10. Implement Solution 1 (Nginx API Reverse Proxy) | Done | Nginx reverse proxies `/api` to gateway, client uses relative `/api`, gateway supports same-origin |
-| 11. Connect image tags & force-recreate | Done | Added image tags to compose files, fixed build-images.sh default arg to /api, added --force-recreate |
+| 1. Explore project context | Done | Inspected 6 Express microservices, ports 4000-4005, compose stacks, and deploy/monitoring folder |
+| 2. Ask clarifying questions | Done | Agreed on Prometheus metrics, /metrics & /metrices alias, full Docker Compose stack, internal scraping |
+| 3. Propose 2-3 approaches | Done | Selected Approach 1: Native prom-client middleware across services with Prometheus + Grafana stack |
+| 4. Present design | Done | Approved Section 1 (Architecture), Section 2 (Instrumentation), and Section 3 (Prometheus, Loki, Promtail, Grafana) |
+| 5. Write design doc | In Progress | Saving to docs/plans/2026-11-10-prometheus-grafana-monitoring-design.md and committing |
+| 6. Transition to implementation | Pending | Invoke writing-plans skill |
