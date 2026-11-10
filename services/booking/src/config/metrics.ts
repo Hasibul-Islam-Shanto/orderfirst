@@ -56,3 +56,4 @@ export function createMetrics(serviceName: string) {
 }
 
 export const metrics = createMetrics('booking');
+

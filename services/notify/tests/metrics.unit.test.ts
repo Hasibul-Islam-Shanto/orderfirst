@@ -22,3 +22,4 @@ describe('Notify Service Metrics Telemetry Endpoints', () => {
     expect(res.text).toContain('service="notify"');
   });
 });
+

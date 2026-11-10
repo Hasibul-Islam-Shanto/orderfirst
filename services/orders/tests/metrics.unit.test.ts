@@ -22,3 +22,4 @@ describe('Orders Service Metrics Telemetry Endpoints', () => {
     expect(res.text).toContain('service="orders"');
   });
 });
+

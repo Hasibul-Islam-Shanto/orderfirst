@@ -25,3 +25,4 @@ scrape_configs:
         target_label: 'service'
       - source_labels: ['__meta_docker_container_log_stream']
         target_label: 'stream'
+

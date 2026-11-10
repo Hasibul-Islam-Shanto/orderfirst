@@ -31,3 +31,4 @@ scrape_configs:
       - targets: ['notify:4005']
         labels:
           service: 'notify'
+

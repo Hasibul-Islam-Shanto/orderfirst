@@ -22,3 +22,4 @@ describe('Gateway Service Metrics Telemetry Endpoints', () => {
     expect(res.text).toContain('service="gateway"');
   });
 });
+

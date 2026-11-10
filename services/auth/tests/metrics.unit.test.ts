@@ -22,3 +22,4 @@ describe('Auth Service Metrics Telemetry Endpoints', () => {
     expect(res.text).toContain('service="auth"');
   });
 });
+
