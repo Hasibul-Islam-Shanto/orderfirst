@@ -1,7 +1,6 @@
 | Task | Status | Notes |
 | :--- | :--- | :--- |
-| Task 1: Add Playwright Dependency and Script Configuration | Done | Installed `playwright` 1.50+ & Chromium; added `screenshots` script in `client/package.json` |
-| Task 2: Implement Standalone Capture Script | Done | Created `scripts/capture-screenshots.mjs` with multi-context isolation & Retina scale |
-| Task 3: Execute Capture Script and Verify Screenshots | Done | Generated 15 verified 3840×2160 (1920×1080 @ 2x DPR) PNGs in `docs/screenshots/` |
-| Task 4: Integrate Visual Walkthrough into README.md | Done | Embedded structured visual tour, demo account details, and regeneration commands in `README.md` |
-| Task 5: Final Review and Validation | Done | Verified 15/15 Retina screenshots, client typecheck (0 errors), client build passed |
+| Task 1: Draft comprehensive README restructure plan | Done | Outlined all 8 requested sections and technical details |
+| Task 2: Write complete restructured README.md | Done | Wrote Project Overview, Mermaid Architecture, Tools Matrix, Local Setup (Docker & Native), EC2 Deployment, Screenshots, Problems Faced, What You Learned |
+| Task 3: Verify links, formatting, and markdown syntax | Done | Confirmed 15/15 screenshot images, syntax blocks, and table links |
+| Task 4: Final commit and review | In Progress | Committing changes to git |
