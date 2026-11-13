@@ -4,3 +4,4 @@
 | Task 2: Write complete restructured README.md | Done | Wrote Project Overview, Mermaid Architecture, Tools Matrix, Local Setup (Docker & Native), EC2 Deployment, Screenshots, Problems Faced, What You Learned |
 | Task 3: Verify links, formatting, and markdown syntax | Done | Confirmed 15/15 screenshot images, syntax blocks, and table links |
 | Task 4: Final commit and review | Done | Committed restructured README to git on branch `dev` |
+| Task 5: Add Jenkins pipeline stage view screenshots | Done | Added Stage View 1 (Quality Gate) & Stage View 2 (Docker Builds & Zero-Downtime Rolling Deployment) with detailed descriptions to README.md |
