@@ -32,7 +32,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ALL_SERVICES=("auth" "catalog" "booking" "orders" "notify" "gateway" "client")
 
-PLATFORM="linux/amd64,linux/arm64"
+PLATFORM="linux/amd64"
 REGISTRY="${DOCKER_REGISTRY:-orderfirst}"
 PUSH_FLAG=false
 LOAD_FLAG=false
@@ -112,16 +112,42 @@ echo "Push to Registry:   ${PUSH_FLAG}"
 echo "Load to Local:      ${LOAD_FLAG}"
 echo "======================================================"
 
-# Ensure buildx builder exists and supports multi-arch
-BUILDER_NAME="orderfirst-multiarch"
-if ! docker buildx ls | grep -q "${BUILDER_NAME}"; then
-  echo "[INFO] Creating Docker buildx builder: ${BUILDER_NAME}..."
-  docker buildx create --name "${BUILDER_NAME}" --driver docker-container --bootstrap --use >/dev/null 2>&1 || true
-else
-  docker buildx use "${BUILDER_NAME}" >/dev/null 2>&1 || true
+export DOCKER_BUILDKIT=1
+
+# Verify Docker daemon is reachable by the current user
+if ! docker info >/dev/null 2>&1; then
+  echo "======================================================"
+  echo "❌ [ERROR] Cannot connect to Docker daemon as user '$(whoami)'!"
+  echo "Possible fixes on Ubuntu/EC2:"
+  echo "  1. Add jenkins user to docker group:"
+  echo "     sudo usermod -aG docker $(whoami)"
+  echo "     sudo systemctl restart jenkins"
+  echo "  2. Ensure docker service is running:"
+  echo "     sudo systemctl status docker"
+  echo "======================================================"
+  exit 1
 fi
 
-# Build action arguments
+# Check if docker buildx is installed
+HAS_BUILDX=false
+if docker buildx version >/dev/null 2>&1; then
+  HAS_BUILDX=true
+  echo "[INFO] Docker Buildx detected. Multi-platform build enabled for [${PLATFORM}]."
+  
+  # Ensure buildx builder exists and supports multi-arch
+  BUILDER_NAME="orderfirst-multiarch"
+  if ! docker buildx ls 2>/dev/null | grep -q "${BUILDER_NAME}"; then
+    echo "[INFO] Creating Docker buildx builder: ${BUILDER_NAME}..."
+    docker buildx create --name "${BUILDER_NAME}" --driver docker-container --bootstrap --use >/dev/null 2>&1 || true
+  else
+    docker buildx use "${BUILDER_NAME}" >/dev/null 2>&1 || true
+  fi
+else
+  echo "[WARN] 'docker buildx' plugin is not installed on this system."
+  echo "[INFO] Falling back to standard 'docker build' for native architecture ($(uname -m))."
+fi
+
+# Build action arguments for buildx
 ACTION_ARGS=()
 if [ "${PUSH_FLAG}" = "true" ]; then
   ACTION_ARGS+=("--push")
@@ -132,12 +158,12 @@ fi
 # Build each service
 for SVC in "${SERVICES[@]}"; do
   echo "------------------------------------------------------"
-  echo "[BUILDING] Service: ${SVC} for [${PLATFORM}]..."
+  echo "[BUILDING] Service: ${SVC}..."
   
   if [ "${SVC}" = "client" ]; then
     CONTEXT_DIR="${PROJECT_ROOT}/client"
     DOCKERFILE="${PROJECT_ROOT}/client/Dockerfile"
-    BUILD_ARGS=("--build-arg" "VITE_API_URL=${VITE_API_URL:-http://localhost:4000/api}")
+    BUILD_ARGS=("--build-arg" "VITE_API_URL=${VITE_API_URL:-/api}")
   else
     CONTEXT_DIR="${PROJECT_ROOT}/services/${SVC}"
     DOCKERFILE="${PROJECT_ROOT}/services/${SVC}/Dockerfile"
@@ -149,15 +175,31 @@ for SVC in "${SERVICES[@]}"; do
     exit 1
   fi
 
-  # shellcheck disable=SC2068
-  docker buildx build \
-    --platform "${PLATFORM}" \
-    -t "${REGISTRY}/${SVC}:${TAG}" \
-    -t "${REGISTRY}/${SVC}:latest" \
-    -f "${DOCKERFILE}" \
-    ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
-    ${ACTION_ARGS[@]+"${ACTION_ARGS[@]}"} \
-    "${CONTEXT_DIR}"
+  if [ "${HAS_BUILDX}" = "true" ]; then
+    # shellcheck disable=SC2068
+    docker buildx build \
+      --platform "${PLATFORM}" \
+      -t "${REGISTRY}/${SVC}:${TAG}" \
+      -t "${REGISTRY}/${SVC}:latest" \
+      -f "${DOCKERFILE}" \
+      ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
+      ${ACTION_ARGS[@]+"${ACTION_ARGS[@]}"} \
+      "${CONTEXT_DIR}"
+  else
+    # Standard docker build fallback (native host architecture)
+    # shellcheck disable=SC2068
+    docker build \
+      -t "${REGISTRY}/${SVC}:${TAG}" \
+      -t "${REGISTRY}/${SVC}:latest" \
+      -f "${DOCKERFILE}" \
+      ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
+      "${CONTEXT_DIR}"
+
+    if [ "${PUSH_FLAG}" = "true" ]; then
+      docker push "${REGISTRY}/${SVC}:${TAG}"
+      docker push "${REGISTRY}/${SVC}:latest"
+    fi
+  fi
 
   echo "✅ [SUCCESS] Built ${SVC} (${REGISTRY}/${SVC}:${TAG})"
 done

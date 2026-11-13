@@ -1,7 +1,7 @@
 | Task | Status | Notes |
 | :--- | :--- | :--- |
-| 1. Explore project context | Done | Scanned repository for dead code, temporary files, orphan configs |
-| 2. Ask clarifying questions | Done | Confirmed no breaking changes, confirmed empty folders to clean |
-| 3. Propose cleanup approach | Done | Safe removal of orphan .gitkeep, empty dirs, .DS_Store |
-| 4. Present design & audit items | Done | Verified 0 deadcode, 0 TODOs, 0 FIXMEs across monorepo |
-| 5. Execute cleanup & verification | Done | All 6 services typecheck clean, client builds, 100% unit tests pass |
+| Task 1: Draft comprehensive README restructure plan | Done | Outlined all 8 requested sections and technical details |
+| Task 2: Write complete restructured README.md | Done | Wrote Project Overview, Mermaid Architecture, Tools Matrix, Local Setup (Docker & Native), EC2 Deployment, Screenshots, Problems Faced, What You Learned |
+| Task 3: Verify links, formatting, and markdown syntax | Done | Confirmed 15/15 screenshot images, syntax blocks, and table links |
+| Task 4: Final commit and review | Done | Committed restructured README to git on branch `dev` |
+| Task 5: Add Jenkins pipeline stage view screenshots | Done | Added Stage View 1 (Quality Gate) & Stage View 2 (Docker Builds & Zero-Downtime Rolling Deployment) with detailed descriptions to README.md |
