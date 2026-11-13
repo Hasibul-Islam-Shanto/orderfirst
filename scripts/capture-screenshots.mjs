@@ -38,7 +38,7 @@ const DEMO_ADMIN = {
   name: 'Marcus Sterling',
 };
 
-// Mock data fixtures (used if backend microservices are offline)
+// High-fidelity fixture data
 const MOCK_CATEGORIES = [
   { id: 'cat-1', name: 'Starters', slug: 'starters' },
   { id: 'cat-2', name: 'Main Course', slug: 'mains' },
@@ -130,6 +130,7 @@ const MOCK_TABLES = [
   { id: 'tbl-3', tableNumber: 3, capacity: 4, isAvailable: false },
   { id: 'tbl-4', tableNumber: 4, capacity: 6, isAvailable: true },
   { id: 'tbl-5', tableNumber: 5, capacity: 8, isAvailable: true },
+  { id: 'tbl-6', tableNumber: 6, capacity: 2, isAvailable: true },
 ];
 
 const MOCK_ORDERS = [
@@ -163,6 +164,20 @@ const MOCK_ORDERS = [
       { id: 'oi-4', quantity: 1, unitPrice: 28, menuItemId: 'salmon', menuItemName: 'Herb-Roasted Salmon', menuItem: MOCK_MENU_ITEMS[3] },
     ],
   },
+  {
+    id: 'ord-103',
+    userId: 'usr-guest-2',
+    customerName: 'Lucas Croft',
+    customerEmail: 'lucas@example.com',
+    status: 'CONFIRMED',
+    orderType: 'DINE_IN',
+    total: 36.0,
+    notes: 'Table 2',
+    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+    items: [
+      { id: 'oi-5', quantity: 1, unitPrice: 36, menuItemId: 'steak', menuItemName: 'Chargrilled Ribeye', menuItem: MOCK_MENU_ITEMS[5] },
+    ],
+  },
 ];
 
 const MOCK_RESERVATIONS = [
@@ -190,6 +205,18 @@ const MOCK_RESERVATIONS = [
     specialRequest: null,
     status: 'COMPLETED',
   },
+  {
+    id: 'res-203',
+    userId: 'usr-guest-3',
+    customerName: 'Sophia Lin',
+    customerEmail: 'sophia@example.com',
+    restaurantTableId: 'tbl-1',
+    restaurantTable: MOCK_TABLES[0],
+    reservationDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+    guestCount: 2,
+    specialRequest: 'Quiet table requested',
+    status: 'CONFIRMED',
+  },
 ];
 
 async function isUrlReachable(url) {
@@ -215,10 +242,23 @@ async function setupMockApiRoute(context, currentUserRole = null) {
         body: JSON.stringify(data),
       });
 
+    // 0. SSE Event Stream (prevent 401 disconnect triggers)
+    if (path.includes('/events/stream')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+        body: ': heartbeat\n\n',
+      });
+    }
+
     // 1. Auth / Current User
     if (path === '/auth/me') {
       if (!currentUserRole) {
-        return json({ message: 'Unauthenticated' }, 401);
+        return json({ success: false, message: 'Unauthenticated', code: 'UNAUTHENTICATED' }, 401);
       }
       return json({
         success: true,
@@ -261,11 +301,12 @@ async function setupMockApiRoute(context, currentUserRole = null) {
     }
 
     // 4. Menu Items
-    if (path.startsWith('/menu/items')) {
+    if (path.startsWith('/menu/items') || path.startsWith('/admin/menu/items')) {
       const parts = path.split('/').filter(Boolean);
-      if (parts.length > 2) {
-        const item = MOCK_MENU_ITEMS.find((m) => m.id === parts[2]) || MOCK_MENU_ITEMS[0];
-        return json({ success: true, message: 'Menu item', data: item });
+      const last = parts[parts.length - 1];
+      const match = MOCK_MENU_ITEMS.find((m) => m.id === last);
+      if (match) {
+        return json({ success: true, message: 'Menu item', data: match });
       }
       return json({
         success: true,
@@ -276,7 +317,7 @@ async function setupMockApiRoute(context, currentUserRole = null) {
     }
 
     // 5. Customer Orders
-    if (path.startsWith('/orders')) {
+    if (path === '/orders' || path.startsWith('/orders?')) {
       return json({
         success: true,
         message: 'Orders',
@@ -289,7 +330,7 @@ async function setupMockApiRoute(context, currentUserRole = null) {
     if (path.startsWith('/reservations/availability')) {
       return json({ success: true, message: 'Available tables', data: MOCK_TABLES });
     }
-    if (path.startsWith('/reservations')) {
+    if (path === '/reservations' || path.startsWith('/reservations?')) {
       return json({
         success: true,
         message: 'Reservations',
@@ -348,8 +389,8 @@ async function setupMockApiRoute(context, currentUserRole = null) {
       });
     }
 
-    // Fallback pass through
-    await route.continue();
+    // Default JSON fallback
+    return json({ success: true, message: 'OK', data: [] });
   });
 }
 
@@ -359,11 +400,12 @@ async function capture(page, fileName, description) {
 
   // Wait for network and DOM stabilization
   await page.waitForLoadState('networkidle').catch(() => {});
-  await page.waitForTimeout(600); // Allow CSS transitions and fonts to settle
+  await page.locator('.skeleton').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
+  await page.waitForTimeout(600); // Allow fonts and transitions to settle
 
   await page.screenshot({
     path: filePath,
-    fullPage: false, // 16:9 uniform widescreen frame
+    fullPage: false, // Standard uniform 16:9 widescreen frame
   });
 
   const stats = await fs.stat(filePath);
@@ -389,7 +431,6 @@ async function main() {
       detached: false,
     });
 
-    // Wait for server to respond
     let attempts = 0;
     while (attempts < 20) {
       await new Promise((r) => setTimeout(r, 600));
@@ -406,15 +447,7 @@ async function main() {
     console.log(`✓ Found running web server at ${BASE_URL}`);
   }
 
-  // 2. Check Backend Gateway Status
-  const backendUp = await isUrlReachable('http://localhost:4000/health');
-  if (backendUp) {
-    console.log('✓ API Gateway detected at :4000 (Using live microservices)');
-  } else {
-    console.log('ℹ API Gateway (:4000) not detected (Using high-fidelity mock data)');
-  }
-
-  // 3. Launch Playwright
+  // 2. Launch Playwright
   console.log('\n🚀 Launching Chromium (Viewport 1920x1080 @ 2x DPR)...');
   const browser = await chromium.launch({
     headless: !isHeaded,
@@ -422,14 +455,14 @@ async function main() {
 
   try {
     // =========================================================================
-    // FLOW 1: Public & Guest Flow
+    // FLOW 1: Public & Guest Experience Flow
     // =========================================================================
     console.log('\n--- [1/3] Public & Guest Experience Flow ---');
     const guestContext = await browser.newContext({
       viewport: VIEWPORT,
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
-    if (!backendUp) await setupMockApiRoute(guestContext, null);
+    await setupMockApiRoute(guestContext, null);
     const guestPage = await guestContext.newPage();
 
     // 01. Home Page
@@ -446,7 +479,7 @@ async function main() {
 
     // 04. Add Item & Cart Page
     const addToCartBtn = guestPage.locator('button:has-text("Add to cart")');
-    if (await addToCartBtn.count() > 0) {
+    if ((await addToCartBtn.count()) > 0) {
       await addToCartBtn.first().click();
       await guestPage.waitForTimeout(500);
     }
@@ -470,20 +503,13 @@ async function main() {
     // =========================================================================
     // FLOW 2: Customer Authenticated Flow
     // =========================================================================
-    console.log('\n--- [2/3] Authenticated Customer Flow (customer@orderfirst.dev) ---');
+    console.log(`\n--- [2/3] Authenticated Customer Flow (${DEMO_CUSTOMER.email}) ---`);
     const customerContext = await browser.newContext({
       viewport: VIEWPORT,
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
-    if (!backendUp) await setupMockApiRoute(customerContext, 'customer');
+    await setupMockApiRoute(customerContext, 'customer');
     const customerPage = await customerContext.newPage();
-
-    // Log in
-    await customerPage.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
-    await customerPage.fill('input#email', DEMO_CUSTOMER.email);
-    await customerPage.fill('input#password', DEMO_CUSTOMER.password);
-    await customerPage.click('button.button.full');
-    await customerPage.waitForTimeout(600);
 
     // 08. My Orders
     await customerPage.goto(`${BASE_URL}/my-orders`, { waitUntil: 'networkidle' });
@@ -502,20 +528,13 @@ async function main() {
     // =========================================================================
     // FLOW 3: Admin Management Flow
     // =========================================================================
-    console.log('\n--- [3/3] Authenticated Admin Management Flow (admin@orderfirst.dev) ---');
+    console.log(`\n--- [3/3] Authenticated Admin Management Flow (${DEMO_ADMIN.email}) ---`);
     const adminContext = await browser.newContext({
       viewport: VIEWPORT,
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
-    if (!backendUp) await setupMockApiRoute(adminContext, 'admin');
+    await setupMockApiRoute(adminContext, 'admin');
     const adminPage = await adminContext.newPage();
-
-    // Log in
-    await adminPage.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
-    await adminPage.fill('input#email', DEMO_ADMIN.email);
-    await adminPage.fill('input#password', DEMO_ADMIN.password);
-    await adminPage.click('button.button.full');
-    await adminPage.waitForTimeout(600);
 
     // 11. Admin Overview / Dashboard
     await adminPage.goto(`${BASE_URL}/admin/overview`, { waitUntil: 'networkidle' });
