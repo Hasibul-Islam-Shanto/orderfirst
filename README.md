@@ -41,7 +41,104 @@ OrderFirst has been migrated from a monolithic backend into a distributed, produ
 
 ---
 
-## Running the Application
+## 📸 Application Walkthrough & Visual Tour
+
+OrderFirst features dedicated, role-tailored flows for both dining customers and restaurant operations staff. All screens below are automatically captured in native 4K Retina resolution (1920×1080 @ 2x DPR) using Playwright.
+
+### 🍽️ Customer Experience Walkthrough
+
+#### Step 1: Discovery & Hero Highlights
+*Explore seasonal specials, featured chef selections, and quick dining action shortcuts.*
+![Customer Home](docs/screenshots/01-customer-home.png)
+
+#### Step 2: Categorized Menu & Dietary Filters
+*Browse items by category (Starters, Mains, Burgers, Pizza, Pasta, Desserts, Drinks) with real-time text search and dietary availability.*
+![Customer Menu](docs/screenshots/02-customer-menu.png)
+
+#### Step 3: Dish Detail & Order Customization
+*Inspect high-resolution dish photography, ingredients, preparation time, and add items directly to order.*
+![Customer Menu Detail](docs/screenshots/03-customer-menu-detail.png)
+
+#### Step 4: Active Cart & Checkout Preparation
+*Review itemized dishes, adjust quantities, view subtotal and estimated charges before placing order.*
+![Customer Cart](docs/screenshots/04-customer-cart.png)
+
+#### Step 5: Table Reservation Booking
+*Select date, time slot, party size, and specify special seating requests.*
+![Customer Reservation Form](docs/screenshots/05-customer-reservation-form.png)
+
+#### Step 6: Customer Order Tracking & History
+*Real-time fulfillment tracking from kitchen preparation to completion (Signed in as `customer@orderfirst.dev`).*
+![Customer My Orders](docs/screenshots/08-customer-my-orders.png)
+
+#### Step 7: Customer Reservations Management
+*Review active table bookings, confirmed arrival slots, and past dining history.*
+![Customer My Reservations](docs/screenshots/09-customer-my-reservations.png)
+
+#### Step 8: Customer Profile & Account Preferences
+*Manage personal information, contact credentials, and verified session security.*
+![Customer Account](docs/screenshots/10-customer-account.png)
+
+---
+
+### 🛡️ Authentication & Demo Access
+
+OrderFirst provides built-in 1-click demo credential shortcuts for fast testing and role evaluation:
+- **Customer Account**: `customer@orderfirst.dev` / `password123`
+- **Admin Account**: `admin@orderfirst.dev` / `password123`
+
+#### Customer & Staff Sign-In
+*Session authenticated via secure, HTTP-only cookie.*
+![Sign In](docs/screenshots/06-auth-login.png)
+
+#### New Guest Registration
+*Customer onboarding with email verification workflow.*
+![Sign Up](docs/screenshots/07-auth-register.png)
+
+---
+
+### 💼 Restaurant Admin & Operations Suite
+
+The Admin workspace (`/admin`) equips restaurant operators, floor managers, and kitchen teams with live operational control (Signed in as `admin@orderfirst.dev`).
+
+#### Step 1: Executive KPI Operations Dashboard
+*Real-time overview of daily revenue, order volume, upcoming reservations, table occupancy, and popular dishes.*
+![Admin Overview](docs/screenshots/11-admin-overview.png)
+
+#### Step 2: Live Kitchen & Order Dispatch
+*Kitchen pipeline management: track incoming orders, transition preparation stages, and review order notes.*
+![Admin Orders](docs/screenshots/13-admin-order-management.png)
+
+#### Step 3: Menu Catalog & Availability Manager
+*Live inventory control: update dish pricing, toggle instant menu item availability, and manage categories.*
+![Admin Menu Management](docs/screenshots/12-admin-menu-management.png)
+
+#### Step 4: Table Reservations & Seating Timetable
+*Guest seating management: review reservation statuses, party sizes, and confirm upcoming table arrivals.*
+![Admin Reservation Management](docs/screenshots/14-admin-reservation-management.png)
+
+#### Step 5: Restaurant Floor Plan & Table Management
+*Manage dining room layout, table numbers, guest capacities, and active availability.*
+![Admin Table Management](docs/screenshots/15-admin-table-management.png)
+
+---
+
+### 🔄 Generating & Updating Screenshots
+
+High-resolution screenshots can be regenerated on demand at any time:
+
+```bash
+# From repository root:
+node scripts/capture-screenshots.mjs
+
+# Or from client directory:
+npm run screenshots --prefix client
+
+# Target a custom URL (e.g. Docker container or staging):
+BASE_URL=http://localhost:80 node scripts/capture-screenshots.mjs
+```
+
+---
 
 OrderFirst provides dedicated configurations for **local development**, **containerized dev/staging**, and **hardened production**.
 
