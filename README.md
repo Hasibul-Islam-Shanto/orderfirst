@@ -17,6 +17,7 @@ OrderFirst is an enterprise-grade, distributed microservices restaurant ordering
    - [Customer Experience](#-customer-experience)
    - [Authentication & Demo Access](#-authentication--demo-access)
    - [Admin & Kitchen Management](#-restaurant-admin--operations-suite)
+   - [CI/CD Deployment Stages (Jenkins)](#-cicd-deployment-pipeline-stages-jenkins)
    - [Regenerating Screenshots](#-regenerating-screenshots)
 7. [Problems Faced & Engineering Solutions](#-problems-faced--engineering-solutions)
 8. [What You Learned](#-what-you-learned)
@@ -455,6 +456,41 @@ The Admin workspace (`/admin`) equips restaurant operators, floor managers, and 
 #### Step 5: Restaurant Floor Plan & Table Management
 *Manage dining room layout, table numbers, guest capacities, and active availability.*
 ![Admin Table Management](docs/screenshots/15-admin-table-management.png)
+
+---
+
+### 🚢 CI/CD Deployment Pipeline Stages (Jenkins)
+
+OrderFirst features an automated, monorepo-aware CI/CD pipeline governed by [`deploy/jenkins/Jenkinsfile`](file:///Users/hi-shanto/Documents/orderfirst/deploy/jenkins/Jenkinsfile). The pipeline ensures that every microservice commit is verified through parallel quality gates, packaged into multi-architecture Docker manifests, and deployed with zero downtime to production.
+
+#### Stage View 1: Parallel Quality Gate & Selective Change Detection
+*Demonstrates SCM checkout, intelligent change detection (`detect-changes.sh`), and concurrent quality gating (unit tests & typechecks) running in parallel across all microservices (Auth, Catalog, Booking, Orders, Notify, Gateway).*
+
+<img src="docs/screenshots/Screenshot%202026-11-09%20at%209.27.25%E2%80%AFPM.png" alt="Jenkins Pipeline Quality Gate & Parallel Tests" width="100%" />
+
+- **Declarative: Checkout SCM**: Clones and verifies the target branch repository revision (`dev` or `main`).
+- **Initialize & Change Detection**: Invokes [`deploy/jenkins/scripts/detect-changes.sh`](file:///Users/hi-shanto/Documents/orderfirst/deploy/jenkins/scripts/detect-changes.sh) to calculate `git diff` against the previous commit, isolating modified microservice folders so unaffected services bypass redundant builds.
+- **Parallel Quality Gate (Test & Lint)**: Spawns concurrent testing pipelines across all microservices:
+  - `Test: Auth` (Port 4001)
+  - `Test: Catalog` (Port 4002)
+  - `Test: Booking` (Port 4003)
+  - `Test: Orders` (Port 4004)
+  - `Test: Notify` (Port 4005)
+  - `Test: Gateway` (Port 4000)
+- **Quality Assurance Outcome**: As visible in builds `#13` through `#16`, all unit test suites, TypeScript compilation checks, and ESLint validations achieve 100% green status before container packaging begins.
+
+---
+
+#### Stage View 2: Multi-Platform Docker Builds & Zero-Downtime Rolling Deployment
+*Demonstrates frontend client compilation, parallel multi-service Docker container packaging, registry image push, and live zero-downtime rolling container updates.*
+
+<img src="docs/screenshots/Screenshot%202026-11-09%20at%209.27.40%E2%80%AFPM.png" alt="Jenkins Docker Builds & Zero-Downtime Deployment" width="100%" />
+
+- **Test: Client**: Executes production Vite bundle compilation, linting, and component tests for the React frontend application.
+- **Parallel Docker Build & Tag**: Packages container images concurrently for all modified microservices (`auth`, `catalog`, `booking`, `orders`, `notify`, `gateway`, `client`) supporting multi-architecture targets (`linux/amd64` and `linux/arm64`).
+- **Push Docker Images to Registry**: Tags and uploads release artifacts to the centralized container registry.
+- **Zero-Downtime Rolling Deployment**: Executes [`deploy/jenkins/scripts/deploy.sh`](file:///Users/hi-shanto/Documents/orderfirst/deploy/jenkins/scripts/deploy.sh), which verifies PostgreSQL readiness, applies pending database schema migrations (`db-migrate`), and rolls only updated service containers (`docker compose up -d --no-deps <changed-services>`). Active dining guest sessions, ongoing shopping carts, and database connections remain online with zero service disruption.
+- **Declarative: Post Actions**: Cleans temporary workspace caches and reports pipeline build status notifications.
 
 ---
 
