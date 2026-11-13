@@ -139,3 +139,4 @@ Run `git status` and `git log -n 5` to confirm clean commits.
 
 **Step 2: Update checklist**
 Mark all tasks complete in `docs/plans/task.md`.
+

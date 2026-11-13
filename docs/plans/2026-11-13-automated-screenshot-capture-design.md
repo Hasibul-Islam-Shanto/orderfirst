@@ -55,3 +55,4 @@ Screenshots will be arranged logically in `README.md` under `## 📸 Application
 2. Authentication & Demo Access (Login & Register).
 3. Admin & Kitchen Management Suite (KPI Overview, Live Order Kanban, Menu CRUD, Table & Reservation Management).
 4. Command instructions for on-demand screenshot regeneration.
+
